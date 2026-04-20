@@ -1,0 +1,1318 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
+<title>FocusFlow — Complete App</title>
+<link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=Epilogue:wght@400;600;700;800;900&display=swap" rel="stylesheet">
+<style>
+:root {
+  --bg: #0c0c10;
+  --surface: #13131a;
+  --card: #18181f;
+  --card2: #1e1e28;
+  --border: #22222e;
+  --border2: #2a2a38;
+  --accent: #ff5f5f;
+  --accent2: #ff8c42;
+  --glow: rgba(255,95,95,0.12);
+  --text: #e2e2ee;
+  --sub: #8888aa;
+  --muted: #44445a;
+  --green: #3dffa0;
+  --blue: #5b9fff;
+  --yellow: #ffc84a;
+  --mono: 'DM Mono', monospace;
+  --sans: 'Epilogue', sans-serif;
+}
+
+* { margin:0; padding:0; box-sizing:border-box; -webkit-tap-highlight-color:transparent; }
+
+body {
+  background: #060608;
+  display: flex;
+  justify-content: center;
+  align-items: flex-start;
+  min-height: 100vh;
+  padding: 32px 16px;
+  font-family: var(--sans);
+}
+
+/* PHONE SHELL */
+.phone {
+  width: 393px;
+  height: 852px;
+  background: var(--bg);
+  border-radius: 50px;
+  border: 2px solid #1a1a24;
+  overflow: hidden;
+  position: relative;
+  box-shadow:
+    0 0 0 1px rgba(255,255,255,0.04),
+    0 60px 160px rgba(0,0,0,0.9),
+    inset 0 1px 0 rgba(255,255,255,0.05);
+  display: flex;
+  flex-direction: column;
+}
+
+/* NOTCH */
+.notch {
+  position: absolute;
+  top: 0; left: 50%;
+  transform: translateX(-50%);
+  width: 120px; height: 34px;
+  background: #060608;
+  border-radius: 0 0 20px 20px;
+  z-index: 100;
+}
+
+/* STATUS BAR */
+.status {
+  height: 44px;
+  padding: 14px 28px 0;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-family: var(--mono);
+  font-size: 11px;
+  color: var(--sub);
+  flex-shrink: 0;
+  z-index: 10;
+}
+
+/* SCREENS */
+.screen {
+  display: none;
+  flex-direction: column;
+  flex: 1;
+  overflow: hidden;
+  animation: screenIn 0.25s ease;
+}
+.screen.active { display: flex; }
+@keyframes screenIn {
+  from { opacity: 0; transform: translateY(6px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+/* SCROLL AREA */
+.scroll-body {
+  flex: 1;
+  overflow-y: auto;
+  scrollbar-width: none;
+}
+.scroll-body::-webkit-scrollbar { display: none; }
+
+/* ── BOTTOM NAV ── */
+.bottom-nav {
+  height: 72px;
+  border-top: 1px solid var(--border);
+  display: flex;
+  align-items: center;
+  background: rgba(12,12,16,0.96);
+  backdrop-filter: blur(20px);
+  flex-shrink: 0;
+  padding-bottom: 4px;
+}
+.nav-btn {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 3px;
+  cursor: pointer;
+  padding: 8px 0;
+  transition: all 0.2s;
+  border: none;
+  background: none;
+}
+.nav-icon { font-size: 22px; line-height: 1; }
+.nav-lbl {
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: 0.8px;
+  text-transform: uppercase;
+  font-family: var(--mono);
+  color: var(--muted);
+  transition: color 0.2s;
+}
+.nav-btn.active .nav-lbl { color: var(--accent); }
+.nav-btn.active .nav-icon { filter: drop-shadow(0 0 8px rgba(255,95,95,0.6)); }
+
+/* ──────────────────────────────────────
+   SCREEN 1 — TIMELINE
+────────────────────────────────────── */
+.tl-header {
+  padding: 6px 22px 14px;
+}
+.tl-top {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 14px;
+}
+.tl-title { font-size: 24px; font-weight: 900; letter-spacing: -0.8px; }
+.tl-title em { color: var(--accent); font-style: normal; }
+.execute-chip {
+  font-family: var(--mono);
+  font-size: 9px;
+  letter-spacing: 1.5px;
+  text-transform: uppercase;
+  color: var(--accent);
+  border: 1px solid rgba(255,95,95,0.35);
+  background: rgba(255,95,95,0.08);
+  padding: 4px 11px;
+  border-radius: 20px;
+}
+
+/* Week strip */
+.week { display: flex; gap: 5px; overflow-x: auto; scrollbar-width: none; padding-bottom: 2px; }
+.week::-webkit-scrollbar { display: none; }
+.wday {
+  flex-shrink: 0;
+  width: 46px; height: 58px;
+  border-radius: 14px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  display: flex; flex-direction: column;
+  align-items: center; justify-content: center;
+  gap: 3px; cursor: pointer;
+  transition: all 0.18s;
+}
+.wday.cur { background: var(--accent); border-color: var(--accent); box-shadow: 0 4px 18px rgba(255,95,95,0.38); }
+.wday-name { font-size: 8px; font-weight: 700; letter-spacing: 0.5px; text-transform: uppercase; color: var(--sub); font-family: var(--mono); }
+.wday.cur .wday-name { color: rgba(255,255,255,0.7); }
+.wday-num { font-size: 19px; font-weight: 900; color: var(--text); }
+.wday.cur .wday-num { color: #fff; }
+
+/* Timeline items */
+.tl-body { padding: 14px 18px 20px; display: flex; flex-direction: column; gap: 4px; }
+.tl-row { display: flex; gap: 10px; align-items: flex-start; }
+.tl-time-col { width: 38px; flex-shrink: 0; text-align: right; padding-top: 10px; font-family: var(--mono); font-size: 9px; color: var(--muted); line-height: 1.2; }
+.tl-spine { width: 32px; flex-shrink: 0; display: flex; flex-direction: column; align-items: center; }
+.tl-node {
+  width: 32px; height: 32px; border-radius: 50%;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 13px; flex-shrink: 0; cursor: pointer;
+  transition: transform 0.18s; border: 2px solid var(--border);
+  background: var(--surface);
+}
+.tl-node.done { background: var(--card); border-color: var(--green); color: var(--green); }
+.tl-node.now { background: var(--accent); border-color: var(--accent); box-shadow: 0 0 18px rgba(255,95,95,0.55); color: #fff; }
+.tl-node.future { color: var(--sub); }
+.tl-vline { width: 2px; flex: 1; min-height: 16px; margin: 3px 0; }
+.vline-done { background: var(--green); opacity: 0.25; }
+.vline-dash { background: repeating-linear-gradient(to bottom, var(--muted) 0 3px, transparent 3px 7px); opacity: 0.3; }
+
+.tl-card {
+  flex: 1;
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  padding: 10px 12px;
+  margin-bottom: 6px;
+  cursor: pointer;
+  transition: all 0.18s;
+}
+.tl-card:hover { border-color: var(--border2); transform: translateX(2px); }
+.tl-card.now-card { border-color: var(--accent); box-shadow: 0 0 0 1px rgba(255,95,95,0.2); }
+.tc-time { font-family: var(--mono); font-size: 9px; color: var(--sub); margin-bottom: 3px; }
+.tc-name { font-size: 15px; font-weight: 800; margin-bottom: 6px; letter-spacing: -0.3px; }
+.tc-meta { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+.tc-tag {
+  font-family: var(--mono); font-size: 8px; font-weight: 500;
+  padding: 2px 8px; border-radius: 20px; text-transform: uppercase; letter-spacing: 0.5px;
+}
+.tag-s { background: rgba(91,159,255,0.12); color: var(--blue); border: 1px solid rgba(91,159,255,0.25); }
+.tag-w { background: rgba(255,140,66,0.12); color: var(--accent2); border: 1px solid rgba(255,140,66,0.25); }
+.tag-d { background: rgba(61,255,160,0.12); color: var(--green); border: 1px solid rgba(61,255,160,0.25); }
+.tag-m { background: rgba(255,200,74,0.12); color: var(--yellow); border: 1px solid rgba(255,200,74,0.25); }
+.tc-sound { font-family: var(--mono); font-size: 8px; color: var(--muted); display: flex; align-items: center; gap: 3px; }
+.tc-sound::before { content: '♪'; color: var(--accent); }
+
+.start-btn {
+  display: inline-flex; align-items: center; gap: 5px;
+  margin-top: 8px;
+  background: var(--accent); color: #fff;
+  border: none; border-radius: 9px;
+  padding: 6px 14px; font-family: var(--sans);
+  font-size: 11px; font-weight: 700; cursor: pointer;
+  box-shadow: 0 4px 14px rgba(255,95,95,0.38);
+  transition: all 0.18s;
+}
+.start-btn:hover { transform: translateY(-1px); box-shadow: 0 6px 20px rgba(255,95,95,0.5); }
+
+.ring-check {
+  width: 22px; height: 22px; border-radius: 50%;
+  border: 2px solid var(--border); flex-shrink: 0;
+  align-self: center; cursor: pointer; transition: all 0.2s;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 11px;
+}
+.ring-check:hover { border-color: var(--green); }
+.ring-check.done { background: var(--green); border-color: var(--green); color: #0c0c10; font-weight: 900; }
+
+.add-task-row {
+  display: flex; align-items: center; gap: 10px;
+  padding: 4px 0 24px; cursor: pointer; opacity: 0.4; transition: opacity 0.2s;
+}
+.add-task-row:hover { opacity: 0.8; }
+.add-node { width: 32px; height: 32px; border-radius: 50%; border: 2px dashed var(--muted); display: flex; align-items: center; justify-content: center; font-size: 16px; color: var(--muted); flex-shrink: 0; }
+.add-lbl { font-size: 13px; color: var(--sub); font-weight: 600; }
+
+.fab {
+  position: absolute; bottom: 84px; right: 18px;
+  width: 50px; height: 50px; border-radius: 50%;
+  background: var(--accent); border: none; color: #fff;
+  font-size: 22px; cursor: pointer;
+  box-shadow: 0 6px 22px rgba(255,95,95,0.48);
+  display: flex; align-items: center; justify-content: center;
+  transition: all 0.2s; z-index: 20;
+}
+.fab:hover { transform: scale(1.08) rotate(45deg); }
+
+/* ──────────────────────────────────────
+   SCREEN 2 — FOCUS MODE
+────────────────────────────────────── */
+#s-focus {
+  background: var(--bg);
+  align-items: stretch;
+}
+.focus-topbar {
+  display: flex; justify-content: space-between; align-items: center;
+  padding: 8px 22px 14px;
+}
+.focus-back {
+  font-family: var(--mono); font-size: 10px; color: var(--sub);
+  border: 1px solid var(--border); padding: 5px 13px;
+  border-radius: 20px; cursor: pointer; transition: all 0.18s;
+}
+.focus-back:hover { border-color: var(--accent); color: var(--accent); }
+.focus-chip {
+  font-family: var(--mono); font-size: 9px; letter-spacing: 2px;
+  text-transform: uppercase; color: var(--accent);
+  background: rgba(255,95,95,0.09); border: 1px solid rgba(255,95,95,0.28);
+  padding: 5px 13px; border-radius: 20px;
+  display: flex; align-items: center; gap: 5px;
+}
+.rec-dot { width: 6px; height: 6px; background: var(--accent); border-radius: 50%; animation: blink 1s infinite; }
+@keyframes blink { 0%,100% { opacity:1; } 50% { opacity:0.2; } }
+
+.focus-scroll { flex: 1; overflow-y: auto; scrollbar-width: none; padding: 0 22px 16px; display: flex; flex-direction: column; gap: 20px; align-items: center; }
+.focus-scroll::-webkit-scrollbar { display: none; }
+
+/* Task header */
+.focus-task-head { text-align: center; display: flex; flex-direction: column; align-items: center; gap: 8px; padding-top: 4px; }
+.focus-cat-chip {
+  font-family: var(--mono); font-size: 9px; letter-spacing: 1.5px;
+  text-transform: uppercase; color: var(--blue);
+  border: 1px solid rgba(91,159,255,0.3); background: rgba(91,159,255,0.07);
+  padding: 4px 13px; border-radius: 20px;
+}
+.focus-name { font-size: 28px; font-weight: 900; letter-spacing: -1px; line-height: 1.1; }
+
+/* Pomo */
+.pomo-strip { display: flex; align-items: center; gap: 5px; }
+.p-seg { width: 30px; height: 6px; border-radius: 3px; background: var(--border2); transition: all 0.3s; }
+.p-seg.done { background: var(--accent); box-shadow: 0 0 6px rgba(255,95,95,0.45); }
+.p-seg.cur { background: linear-gradient(90deg, var(--accent) 55%, var(--border2) 55%); }
+.p-lbl { font-family: var(--mono); font-size: 9px; color: var(--sub); margin-left: 5px; }
+
+/* Ring */
+.ring-wrap { position: relative; width: 210px; height: 210px; flex-shrink: 0; }
+.ring-svg { transform: rotate(-90deg); overflow: visible; }
+.r-bg { fill: none; stroke: var(--border2); stroke-width: 7; }
+.r-prog {
+  fill: none; stroke: var(--accent); stroke-width: 7; stroke-linecap: round;
+  stroke-dasharray: 597; stroke-dashoffset: 150;
+  filter: drop-shadow(0 0 10px rgba(255,95,95,0.55));
+  transition: stroke-dashoffset 1s linear;
+}
+.ring-inner { position: absolute; top:50%; left:50%; transform: translate(-50%,-50%); text-align: center; }
+.ring-time-big { font-family: var(--mono); font-size: 42px; font-weight: 500; letter-spacing: -2px; line-height: 1; }
+.ring-time-lbl { font-family: var(--mono); font-size: 8px; letter-spacing: 2px; color: var(--sub); margin-top: 5px; text-transform: uppercase; }
+
+/* Sound card */
+.sound-card {
+  width: 100%;
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: 18px;
+  padding: 14px 16px;
+}
+.sc-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; }
+.sc-title { font-family: var(--mono); font-size: 9px; letter-spacing: 1.5px; text-transform: uppercase; color: var(--sub); }
+.sc-live { display: flex; align-items: center; gap: 5px; font-family: var(--mono); font-size: 9px; color: var(--green); }
+.live-dot { width: 5px; height: 5px; border-radius: 50%; background: var(--green); animation: pulse-g 1.3s infinite; }
+@keyframes pulse-g { 0%,100% { opacity:1; transform:scale(1); } 50% { opacity:0.3; transform:scale(0.6); } }
+
+.sound-chips-row { display: flex; gap: 7px; overflow-x: auto; scrollbar-width: none; padding-bottom: 2px; }
+.sound-chips-row::-webkit-scrollbar { display: none; }
+.s-chip {
+  flex-shrink: 0; display: flex; align-items: center; gap: 5px;
+  padding: 7px 13px; border-radius: 20px;
+  font-family: var(--mono); font-size: 10px;
+  border: 1px solid var(--border); background: var(--surface);
+  color: var(--sub); cursor: pointer; transition: all 0.18s;
+}
+.s-chip.on { border-color: var(--blue); background: rgba(91,159,255,0.1); color: var(--blue); }
+.s-chip:hover:not(.on) { border-color: var(--border2); color: var(--text); }
+
+/* Wave bars */
+.wave { display: flex; align-items: center; gap: 2px; height: 16px; }
+.wb { width: 2.5px; border-radius: 2px; background: currentColor; animation: wa 0.7s ease-in-out infinite; }
+.wb:nth-child(2) { animation-delay:.12s; }
+.wb:nth-child(3) { animation-delay:.24s; }
+.wb:nth-child(4) { animation-delay:.16s; }
+.wb:nth-child(5) { animation-delay:.08s; }
+@keyframes wa { 0%,100% { height:3px; } 50% { height:14px; } }
+
+.vol-row { display: flex; align-items: center; gap: 9px; margin-top: 12px; }
+.v-icon { font-size: 12px; color: var(--muted); }
+.v-track { flex: 1; height: 3px; background: var(--border2); border-radius: 2px; position: relative; cursor: pointer; }
+.v-fill { height: 100%; width: 62%; background: linear-gradient(90deg, var(--accent), var(--accent2)); border-radius: 2px; }
+.v-thumb { position: absolute; right: 38%; top: 50%; transform: translate(50%,-50%); width: 13px; height: 13px; border-radius: 50%; background: #fff; box-shadow: 0 1px 6px rgba(0,0,0,0.5); }
+
+/* Flow */
+.flow-card { width: 100%; background: var(--card); border: 1px solid var(--border); border-radius: 16px; padding: 13px 16px; }
+.flow-row { display: flex; justify-content: space-between; margin-bottom: 9px; }
+.flow-lbl { font-family: var(--mono); font-size: 9px; letter-spacing: 1.5px; text-transform: uppercase; color: var(--sub); }
+.flow-pct { font-family: var(--mono); font-size: 11px; font-weight: 500; color: var(--green); }
+.flow-track { height: 5px; background: var(--border2); border-radius: 3px; overflow: hidden; }
+.flow-fill { height: 100%; width: 74%; background: linear-gradient(90deg, var(--blue), var(--green)); border-radius: 3px; }
+
+/* Focus controls */
+.focus-ctrls { display: flex; gap: 10px; width: 100%; padding-bottom: 4px; }
+.fc-btn {
+  flex: 1; padding: 14px 8px; border-radius: 14px;
+  border: 1px solid var(--border); background: var(--card);
+  color: var(--text); font-family: var(--sans);
+  font-size: 12px; font-weight: 700; cursor: pointer; transition: all 0.18s;
+  text-align: center;
+}
+.fc-btn.main {
+  background: var(--accent); border-color: var(--accent); color: #fff;
+  box-shadow: 0 5px 20px rgba(255,95,95,0.38); font-size: 14px;
+}
+.fc-btn:hover { border-color: var(--border2); }
+.fc-btn.main:hover { transform: translateY(-2px); box-shadow: 0 8px 28px rgba(255,95,95,0.5); }
+
+/* ──────────────────────────────────────
+   SCREEN 3 — INBOX
+────────────────────────────────────── */
+.inbox-header {
+  padding: 6px 22px 14px;
+  display: flex; justify-content: space-between; align-items: flex-end;
+  border-bottom: 1px solid var(--border);
+}
+.inbox-title { font-size: 26px; font-weight: 900; letter-spacing: -0.8px; }
+.clear-all { font-family: var(--mono); font-size: 10px; color: var(--muted); cursor: pointer; transition: color 0.2s; padding-bottom: 3px; }
+.clear-all:hover { color: var(--accent); }
+
+/* Quick input */
+.quick-input-wrap {
+  padding: 16px 18px 12px;
+  border-bottom: 1px solid var(--border);
+  background: var(--surface);
+}
+.qi-box {
+  display: flex; align-items: center; gap: 10px;
+  background: var(--card); border: 1.5px solid var(--border2);
+  border-radius: 14px; padding: 0 14px; transition: border-color 0.2s;
+}
+.qi-box:focus-within { border-color: var(--accent); }
+.qi-input {
+  flex: 1; background: none; border: none; outline: none;
+  color: var(--text); font-family: var(--sans); font-size: 15px;
+  font-weight: 600; padding: 14px 0;
+}
+.qi-input::placeholder { color: var(--muted); font-weight: 400; font-size: 14px; }
+.qi-mic { font-size: 18px; cursor: pointer; color: var(--sub); transition: color 0.18s; flex-shrink: 0; }
+.qi-mic:hover { color: var(--accent); }
+.qi-enter {
+  background: var(--accent); border: none; color: #fff;
+  width: 30px; height: 30px; border-radius: 9px;
+  font-size: 16px; cursor: pointer; display: flex; align-items: center; justify-content: center;
+  transition: all 0.18s; flex-shrink: 0;
+}
+.qi-enter:hover { transform: scale(1.1); }
+
+/* Smart suggestion */
+.smart-suggest {
+  margin: 10px 18px 0;
+  background: rgba(91,159,255,0.07);
+  border: 1px solid rgba(91,159,255,0.2);
+  border-radius: 12px;
+  padding: 10px 13px;
+  display: flex; align-items: center; justify-content: space-between;
+  gap: 10px;
+}
+.ss-text { font-size: 11px; color: var(--blue); font-weight: 600; flex: 1; }
+.ss-text span { font-family: var(--mono); }
+.ss-btn {
+  font-family: var(--mono); font-size: 9px; font-weight: 500;
+  color: var(--blue); border: 1px solid rgba(91,159,255,0.35);
+  background: none; padding: 4px 10px; border-radius: 20px;
+  cursor: pointer; flex-shrink: 0; transition: all 0.18s;
+}
+.ss-btn:hover { background: rgba(91,159,255,0.12); }
+
+/* Inbox list */
+.inbox-list { padding: 8px 18px 12px; display: flex; flex-direction: column; }
+.inbox-item {
+  display: flex; align-items: center; gap: 10px;
+  padding: 12px 0;
+  border-bottom: 1px solid var(--border);
+  position: relative; transition: transform 0.2s, opacity 0.2s;
+  cursor: pointer;
+}
+.inbox-item:last-child { border-bottom: none; }
+.inbox-item:hover { background: transparent; }
+.inbox-bullet { width: 7px; height: 7px; border-radius: 50%; background: var(--border2); flex-shrink: 0; margin-top: 1px; }
+.inbox-text { flex: 1; font-size: 14px; font-weight: 600; color: var(--text); }
+.inbox-actions { display: flex; gap: 6px; }
+.ia-btn {
+  font-size: 14px; cursor: pointer; color: var(--muted); transition: all 0.15s;
+  width: 28px; height: 28px; border-radius: 8px;
+  display: flex; align-items: center; justify-content: center;
+}
+.ia-btn:hover { background: var(--card); color: var(--text); }
+
+/* Swipe hint */
+.swipe-hint {
+  margin: 0 18px 12px;
+  display: flex; justify-content: space-between;
+  font-family: var(--mono); font-size: 9px; color: var(--muted); letter-spacing: 0.5px;
+}
+
+/* Move all button */
+.move-all-btn {
+  margin: 0 18px 20px;
+  width: calc(100% - 36px);
+  padding: 15px;
+  background: var(--card); border: 1px solid var(--border2);
+  border-radius: 14px; color: var(--text);
+  font-family: var(--sans); font-size: 14px; font-weight: 700;
+  cursor: pointer; transition: all 0.18s; letter-spacing: 0.3px;
+  display: flex; align-items: center; justify-content: center; gap: 8px;
+}
+.move-all-btn:hover { border-color: var(--accent); color: var(--accent); }
+
+/* ──────────────────────────────────────
+   SCREEN 4 — AI COACH
+────────────────────────────────────── */
+.ai-header {
+  padding: 6px 22px 16px;
+  border-bottom: 1px solid var(--border);
+}
+.ai-title { font-size: 24px; font-weight: 900; letter-spacing: -0.6px; margin-bottom: 2px; }
+.ai-sub { font-family: var(--mono); font-size: 10px; color: var(--sub); letter-spacing: 0.5px; }
+
+.ai-scroll { flex: 1; overflow-y: auto; scrollbar-width: none; padding: 16px 18px 20px; display: flex; flex-direction: column; gap: 14px; }
+.ai-scroll::-webkit-scrollbar { display: none; }
+
+/* Section label */
+.ai-section-lbl {
+  font-family: var(--mono); font-size: 9px; letter-spacing: 2px;
+  text-transform: uppercase; color: var(--muted);
+  padding-bottom: 6px;
+  border-bottom: 1px solid var(--border);
+}
+
+/* Alert card */
+.ai-alert {
+  background: var(--card); border: 1px solid var(--border2);
+  border-radius: 16px; padding: 16px;
+  display: flex; flex-direction: column; gap: 10px;
+}
+.ai-alert.warn { border-color: rgba(255,200,74,0.3); background: rgba(255,200,74,0.04); }
+.ai-alert-top { display: flex; align-items: flex-start; gap: 12px; }
+.ai-alert-icon { font-size: 24px; flex-shrink: 0; margin-top: 1px; }
+.ai-alert-txt h4 { font-size: 14px; font-weight: 800; margin-bottom: 3px; }
+.ai-alert-txt p { font-size: 12px; color: var(--sub); line-height: 1.5; font-weight: 500; }
+.ai-fix-btn {
+  display: flex; align-items: center; justify-content: center; gap: 6px;
+  background: var(--accent); border: none; color: #fff;
+  border-radius: 11px; padding: 10px 16px;
+  font-family: var(--sans); font-size: 13px; font-weight: 700;
+  cursor: pointer; box-shadow: 0 4px 14px rgba(255,95,95,0.35);
+  transition: all 0.18s;
+}
+.ai-fix-btn:hover { transform: translateY(-1px); box-shadow: 0 6px 20px rgba(255,95,95,0.48); }
+
+/* Insight cards */
+.ai-insights { display: flex; flex-direction: column; gap: 8px; }
+.ai-ins {
+  background: var(--card); border: 1px solid var(--border);
+  border-radius: 14px; padding: 13px 14px;
+  display: flex; align-items: center; gap: 12px; transition: border-color 0.18s; cursor: pointer;
+}
+.ai-ins:hover { border-color: var(--border2); }
+.ai-ins-icon { font-size: 22px; flex-shrink: 0; }
+.ai-ins-body { flex: 1; }
+.ai-ins-title { font-size: 13px; font-weight: 700; margin-bottom: 2px; }
+.ai-ins-sub { font-size: 11px; color: var(--sub); font-weight: 500; }
+.ai-ins-arrow { font-size: 16px; color: var(--muted); }
+
+/* One-tap actions */
+.ai-actions { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+.ai-act-btn {
+  background: var(--card); border: 1px solid var(--border);
+  border-radius: 14px; padding: 14px 12px;
+  font-family: var(--sans); font-size: 12px; font-weight: 700;
+  color: var(--text); cursor: pointer; transition: all 0.18s;
+  text-align: left; line-height: 1.3;
+  display: flex; flex-direction: column; gap: 6px;
+}
+.ai-act-btn:hover { border-color: var(--accent); color: var(--accent); }
+.ai-act-icon { font-size: 20px; }
+
+/* Chat input */
+.ai-chat-wrap {
+  background: var(--card); border: 1px solid var(--border);
+  border-radius: 14px; padding: 0 14px;
+  display: flex; align-items: center; gap: 9px;
+}
+.ai-chat-input {
+  flex: 1; background: none; border: none; outline: none;
+  color: var(--text); font-family: var(--sans); font-size: 13px;
+  padding: 13px 0;
+}
+.ai-chat-input::placeholder { color: var(--muted); }
+.ai-send {
+  background: var(--accent); border: none; color: #fff;
+  width: 28px; height: 28px; border-radius: 8px; font-size: 12px;
+  cursor: pointer; display: flex; align-items: center; justify-content: center;
+  flex-shrink: 0; transition: all 0.18s;
+}
+.ai-send:hover { transform: scale(1.08); }
+
+/* ──────────────────────────────────────
+   SCREEN 5 — SETTINGS
+────────────────────────────────────── */
+.set-header {
+  padding: 6px 22px 16px;
+  border-bottom: 1px solid var(--border);
+}
+.set-title { font-size: 24px; font-weight: 900; letter-spacing: -0.6px; }
+
+.set-scroll { flex: 1; overflow-y: auto; scrollbar-width: none; padding: 0 0 20px; }
+.set-scroll::-webkit-scrollbar { display: none; }
+
+.set-section { padding: 16px 22px 4px; }
+.set-section-lbl {
+  font-family: var(--mono); font-size: 8px; letter-spacing: 2px;
+  text-transform: uppercase; color: var(--muted); margin-bottom: 10px;
+}
+
+.set-row {
+  display: flex; align-items: center; gap: 12px;
+  padding: 13px 0; border-bottom: 1px solid var(--border);
+  cursor: pointer; transition: opacity 0.15s;
+}
+.set-row:hover { opacity: 0.8; }
+.set-row:last-child { border-bottom: none; }
+.set-row-icon { font-size: 18px; width: 28px; text-align: center; flex-shrink: 0; }
+.set-row-text { flex: 1; }
+.set-row-label { font-size: 14px; font-weight: 700; }
+.set-row-sub { font-family: var(--mono); font-size: 10px; color: var(--sub); margin-top: 1px; }
+.set-row-right { display: flex; align-items: center; gap: 8px; }
+.set-val { font-family: var(--mono); font-size: 10px; color: var(--sub); }
+.set-arr { font-size: 16px; color: var(--muted); }
+
+/* Toggle */
+.toggle {
+  width: 44px; height: 26px; border-radius: 13px;
+  background: var(--border2); position: relative;
+  cursor: pointer; transition: background 0.2s; flex-shrink: 0;
+}
+.toggle.on { background: var(--accent); }
+.toggle::after {
+  content: ''; position: absolute;
+  top: 3px; left: 3px;
+  width: 20px; height: 20px; border-radius: 50%;
+  background: #fff; transition: transform 0.2s;
+  box-shadow: 0 1px 4px rgba(0,0,0,0.3);
+}
+.toggle.on::after { transform: translateX(18px); }
+
+/* Sound per category */
+.sound-cats { display: flex; flex-direction: column; gap: 0; }
+.sc-row {
+  display: flex; align-items: center; gap: 12px;
+  padding: 11px 0; border-bottom: 1px solid var(--border);
+}
+.sc-row:last-child { border-bottom: none; }
+.sc-icon { font-size: 18px; width: 28px; text-align: center; flex-shrink: 0; }
+.sc-cat { flex: 1; font-size: 13px; font-weight: 700; }
+.sc-sound { font-family: var(--mono); font-size: 10px; color: var(--sub); }
+.sc-edit { font-size: 13px; color: var(--muted); cursor: pointer; transition: color 0.15s; }
+.sc-edit:hover { color: var(--accent); }
+
+/* Accent color */
+.accent-dots { display: flex; gap: 10px; padding: 6px 0 12px; }
+.ac-dot {
+  width: 30px; height: 30px; border-radius: 50%;
+  cursor: pointer; transition: all 0.18s; border: 2px solid transparent;
+}
+.ac-dot.sel { border-color: #fff; transform: scale(1.15); }
+.ac-dot:hover:not(.sel) { transform: scale(1.08); }
+
+/* Danger zone */
+.danger-btn {
+  margin: 0 22px 10px; width: calc(100% - 44px);
+  padding: 13px; background: rgba(255,95,95,0.06);
+  border: 1px solid rgba(255,95,95,0.2); border-radius: 12px;
+  color: var(--accent); font-family: var(--sans); font-size: 13px;
+  font-weight: 700; cursor: pointer; text-align: center; transition: all 0.18s;
+}
+.danger-btn:hover { background: rgba(255,95,95,0.12); }
+
+/* ── NEW TASK SCREEN ── */
+.new-task-header {
+  display: flex; align-items: center; gap: 14px;
+  padding: 8px 22px 16px; border-bottom: 1px solid var(--border);
+}
+.back-ico { font-size: 20px; cursor: pointer; color: var(--sub); transition: color 0.18s; }
+.back-ico:hover { color: var(--text); }
+.nt-title { font-size: 20px; font-weight: 900; }
+.nt-title span { color: var(--accent); }
+
+.nt-body { flex: 1; overflow-y: auto; scrollbar-width: none; padding: 18px 22px; display: flex; flex-direction: column; gap: 20px; }
+.nt-body::-webkit-scrollbar { display: none; }
+
+.nt-label { font-family: var(--mono); font-size: 9px; letter-spacing: 1.8px; text-transform: uppercase; color: var(--sub); display: block; margin-bottom: 9px; }
+.nt-input {
+  width: 100%; background: var(--card); border: 1.5px solid var(--border);
+  border-radius: 13px; padding: 13px 15px; color: var(--text);
+  font-family: var(--sans); font-size: 17px; font-weight: 700; outline: none;
+  transition: border-color 0.2s;
+}
+.nt-input:focus { border-color: var(--accent); }
+.nt-input::placeholder { color: var(--muted); font-weight: 400; font-size: 15px; }
+
+.cat-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 9px; }
+.cat-item {
+  background: var(--card); border: 1.5px solid var(--border);
+  border-radius: 13px; padding: 13px; cursor: pointer; transition: all 0.18s;
+}
+.cat-item:hover { border-color: var(--border2); }
+.cat-item.sel { border-color: var(--accent); background: rgba(255,95,95,0.07); }
+.ci-icon { font-size: 22px; margin-bottom: 5px; }
+.ci-name { font-size: 13px; font-weight: 800; margin-bottom: 2px; }
+.ci-sound { font-family: var(--mono); font-size: 9px; color: var(--sub); }
+
+.time-row { display: flex; gap: 9px; }
+.time-pill {
+  flex: 1; background: var(--card); border: 1.5px solid var(--border);
+  border-radius: 13px; padding: 11px 13px; cursor: pointer; transition: all 0.18s;
+}
+.time-pill:hover { border-color: var(--accent); }
+.tp-lbl { font-family: var(--mono); font-size: 9px; color: var(--sub); text-transform: uppercase; letter-spacing: 1px; margin-bottom: 3px; }
+.tp-val { font-size: 19px; font-weight: 900; font-family: var(--mono); color: var(--accent); }
+
+.dur-chips { display: flex; gap: 7px; flex-wrap: wrap; }
+.dur-chip {
+  padding: 7px 15px; border-radius: 20px;
+  font-family: var(--mono); font-size: 11px;
+  background: var(--card); border: 1px solid var(--border);
+  color: var(--sub); cursor: pointer; transition: all 0.18s;
+}
+.dur-chip.sel { background: var(--accent); border-color: var(--accent); color: #fff; box-shadow: 0 3px 12px rgba(255,95,95,0.38); }
+.dur-chip:hover:not(.sel) { border-color: var(--border2); color: var(--text); }
+
+.sound-preview-card {
+  background: linear-gradient(135deg, rgba(91,159,255,0.07), rgba(61,255,160,0.03));
+  border: 1px solid rgba(91,159,255,0.22);
+  border-radius: 14px; padding: 13px 15px;
+  display: flex; align-items: center; gap: 12px;
+}
+.sp-icon { font-size: 28px; flex-shrink: 0; }
+.sp-body { flex: 1; }
+.sp-title { font-size: 13px; font-weight: 800; color: var(--blue); margin-bottom: 2px; }
+.sp-sub { font-family: var(--mono); font-size: 9px; color: var(--sub); }
+.sp-change { font-family: var(--mono); font-size: 9px; color: var(--sub); border: 1px solid var(--border); padding: 4px 10px; border-radius: 20px; cursor: pointer; transition: all 0.15s; }
+.sp-change:hover { border-color: var(--blue); color: var(--blue); }
+
+.create-btn {
+  width: 100%; padding: 17px; background: var(--accent); border: none;
+  border-radius: 15px; color: #fff; font-family: var(--sans);
+  font-size: 15px; font-weight: 800; cursor: pointer; letter-spacing: 0.3px;
+  box-shadow: 0 6px 22px rgba(255,95,95,0.38); transition: all 0.18s; margin-bottom: 30px;
+}
+.create-btn:hover { transform: translateY(-2px); box-shadow: 0 10px 30px rgba(255,95,95,0.5); }
+</style>
+</head>
+<body>
+<div class="phone">
+  <div class="notch"></div>
+
+<!-- ═══════════════════════════════════
+     S1 — TIMELINE
+═══════════════════════════════════ -->
+<div class="screen active" id="s-timeline">
+  <div class="status"><span>13:42</span><span>⚡ 62%</span></div>
+  <div class="tl-header">
+    <div class="tl-top">
+      <div class="tl-title">April <em>2026</em></div>
+      <div class="execute-chip">Execute</div>
+    </div>
+    <div class="week">
+      <div class="wday"><div class="wday-name">Mon</div><div class="wday-num">13</div></div>
+      <div class="wday"><div class="wday-name">Tue</div><div class="wday-num">14</div></div>
+      <div class="wday"><div class="wday-name">Wed</div><div class="wday-num">15</div></div>
+      <div class="wday"><div class="wday-name">Thu</div><div class="wday-num">16</div></div>
+      <div class="wday"><div class="wday-name">Fri</div><div class="wday-num">17</div></div>
+      <div class="wday cur"><div class="wday-name">Sat</div><div class="wday-num">18</div></div>
+      <div class="wday"><div class="wday-name">Sun</div><div class="wday-num">19</div></div>
+    </div>
+  </div>
+
+  <div class="scroll-body">
+    <div class="tl-body">
+
+      <!-- DONE -->
+      <div class="tl-row">
+        <div class="tl-time-col">08:00</div>
+        <div class="tl-spine">
+          <div class="tl-node done">✓</div>
+          <div class="tl-vline vline-done" style="height:56px;"></div>
+        </div>
+        <div class="tl-card" style="opacity:0.55; border-color:rgba(61,255,160,0.2);">
+          <div class="tc-time">08:00 – 08:15 · 15m</div>
+          <div class="tc-name">Rise and Shine ☀️</div>
+          <div class="tc-meta"><span class="tc-tag tag-d">Routine</span><span class="tc-sound">Birdsong</span></div>
+        </div>
+        <div class="ring-check done">✓</div>
+      </div>
+
+      <!-- NOW -->
+      <div class="tl-row">
+        <div class="tl-time-col">09:00</div>
+        <div class="tl-spine">
+          <div class="tl-node now">📚</div>
+          <div class="tl-vline vline-dash" style="height:90px;"></div>
+        </div>
+        <div class="tl-card now-card">
+          <div class="tc-time">09:00 – 10:30 · 90m</div>
+          <div class="tc-name">Deep Study Session</div>
+          <div class="tc-meta"><span class="tc-tag tag-s">Study</span><span class="tc-sound">Rain + Brown Noise</span></div>
+          <button class="start-btn" onclick="go('s-focus')">▶ Start Focus</button>
+        </div>
+        <div class="ring-check"></div>
+      </div>
+
+      <!-- FUTURE -->
+      <div class="tl-row">
+        <div class="tl-time-col">11:00</div>
+        <div class="tl-spine">
+          <div class="tl-node future">🏋️</div>
+          <div class="tl-vline vline-dash" style="height:56px;"></div>
+        </div>
+        <div class="tl-card">
+          <div class="tc-time">11:00 – 12:00 · 60m</div>
+          <div class="tc-name">Workout</div>
+          <div class="tc-meta"><span class="tc-tag tag-w">Workout</span><span class="tc-sound">Energetic Mix</span></div>
+        </div>
+        <div class="ring-check"></div>
+      </div>
+
+      <div class="tl-row">
+        <div class="tl-time-col">14:00</div>
+        <div class="tl-spine">
+          <div class="tl-node future">💼</div>
+          <div class="tl-vline vline-dash" style="height:50px;"></div>
+        </div>
+        <div class="tl-card">
+          <div class="tc-time">14:00 – 15:00 · 60m</div>
+          <div class="tc-name">Team Meeting</div>
+          <div class="tc-meta"><span class="tc-tag tag-m">Meeting</span><span class="tc-sound">No sound</span></div>
+        </div>
+        <div class="ring-check"></div>
+      </div>
+
+      <div class="add-task-row" onclick="go('s-new')">
+        <div class="add-node">+</div>
+        <div class="add-lbl">Add task...</div>
+      </div>
+    </div>
+  </div>
+
+  <button class="fab" onclick="go('s-new')">+</button>
+
+  <div class="bottom-nav">
+    <button class="nav-btn" onclick="go('s-inbox')"><div class="nav-icon">📥</div><div class="nav-lbl">Inbox</div></button>
+    <button class="nav-btn active" onclick="go('s-timeline')"><div class="nav-icon">📋</div><div class="nav-lbl">Timeline</div></button>
+    <button class="nav-btn" onclick="go('s-ai')"><div class="nav-icon">✦</div><div class="nav-lbl">AI</div></button>
+    <button class="nav-btn" onclick="go('s-settings')"><div class="nav-icon">⚙</div><div class="nav-lbl">Settings</div></button>
+  </div>
+</div>
+
+<!-- ═══════════════════════════════════
+     S2 — FOCUS MODE
+═══════════════════════════════════ -->
+<div class="screen" id="s-focus">
+  <div class="status"><span>13:42</span><span>⚡ 62%</span></div>
+  <div class="focus-topbar">
+    <div class="focus-back" onclick="go('s-timeline')">← Back</div>
+    <div class="focus-chip"><div class="rec-dot"></div>FOCUS MODE</div>
+  </div>
+  <div class="focus-scroll">
+    <div class="focus-task-head">
+      <div class="focus-cat-chip">📚 STUDY SESSION</div>
+      <div class="focus-name">Deep Study<br>Session</div>
+    </div>
+    <div class="pomo-strip">
+      <div class="p-seg done"></div>
+      <div class="p-seg done"></div>
+      <div class="p-seg cur"></div>
+      <div class="p-seg"></div>
+      <div class="p-lbl">3 of 4 sessions</div>
+    </div>
+    <div class="ring-wrap">
+      <svg class="ring-svg" width="210" height="210" viewBox="0 0 210 210">
+        <circle class="r-bg" cx="105" cy="105" r="95"/>
+        <circle class="r-prog" id="rp" cx="105" cy="105" r="95"/>
+      </svg>
+      <div class="ring-inner">
+        <div class="ring-time-big" id="td">18:34</div>
+        <div class="ring-time-lbl">Remaining</div>
+      </div>
+    </div>
+    <div class="sound-card">
+      <div class="sc-header">
+        <div class="sc-title">🎵 Smart Sound</div>
+        <div class="sc-live"><div class="live-dot"></div>Rain · Active</div>
+      </div>
+      <div class="sound-chips-row">
+        <div class="s-chip on"><div class="wave"><div class="wb"></div><div class="wb"></div><div class="wb"></div><div class="wb"></div><div class="wb"></div></div>Rain</div>
+        <div class="s-chip" onclick="selSound(this)">🌊 Ocean</div>
+        <div class="s-chip" onclick="selSound(this)">🔥 Bonfire</div>
+        <div class="s-chip" onclick="selSound(this)">☕ Café</div>
+        <div class="s-chip" onclick="selSound(this)">🌿 Forest</div>
+      </div>
+      <div class="vol-row">
+        <span class="v-icon">🔈</span>
+        <div class="v-track"><div class="v-fill"></div><div class="v-thumb"></div></div>
+        <span class="v-icon">🔊</span>
+      </div>
+    </div>
+    <div class="flow-card">
+      <div class="flow-row"><div class="flow-lbl">⚡ Flow State</div><div class="flow-pct">74%</div></div>
+      <div class="flow-track"><div class="flow-fill"></div></div>
+    </div>
+    <div class="focus-ctrls">
+      <button class="fc-btn" onclick="go('s-timeline')">⏸ Pause</button>
+      <button class="fc-btn main">✓ Done</button>
+      <button class="fc-btn">↩ Skip</button>
+    </div>
+  </div>
+</div>
+
+<!-- ═══════════════════════════════════
+     S3 — INBOX
+═══════════════════════════════════ -->
+<div class="screen" id="s-inbox">
+  <div class="status"><span>13:42</span><span>⚡ 62%</span></div>
+  <div class="inbox-header">
+    <div class="inbox-title">Inbox</div>
+    <div class="clear-all">Clear All</div>
+  </div>
+
+  <div class="quick-input-wrap">
+    <div class="qi-box">
+      <input class="qi-input" id="qi" placeholder="What's on your mind?" autofocus />
+      <span class="qi-mic">🎤</span>
+      <button class="qi-enter" onclick="addInbox()">↵</button>
+    </div>
+  </div>
+
+  <div class="smart-suggest">
+    <div class="ss-text">💡 You usually study at <span>9 AM</span>. Schedule this?</div>
+    <button class="ss-btn">Schedule →</button>
+  </div>
+
+  <div class="scroll-body">
+    <div class="inbox-list" id="inbox-list">
+      <div class="inbox-item">
+        <div class="inbox-bullet"></div>
+        <div class="inbox-text">Review physics notes</div>
+        <div class="inbox-actions">
+          <div class="ia-btn" title="Add time">🕒</div>
+          <div class="ia-btn" title="Schedule">📅</div>
+          <div class="ia-btn" title="Tag">🏷</div>
+        </div>
+      </div>
+      <div class="inbox-item">
+        <div class="inbox-bullet"></div>
+        <div class="inbox-text">Call dentist for appointment</div>
+        <div class="inbox-actions">
+          <div class="ia-btn">🕒</div>
+          <div class="ia-btn">📅</div>
+          <div class="ia-btn">🏷</div>
+        </div>
+      </div>
+      <div class="inbox-item">
+        <div class="inbox-bullet"></div>
+        <div class="inbox-text">Buy groceries — eggs, milk, bread</div>
+        <div class="inbox-actions">
+          <div class="ia-btn">🕒</div>
+          <div class="ia-btn">📅</div>
+          <div class="ia-btn">🏷</div>
+        </div>
+      </div>
+      <div class="inbox-item">
+        <div class="inbox-bullet"></div>
+        <div class="inbox-text">Research internship applications</div>
+        <div class="inbox-actions">
+          <div class="ia-btn">🕒</div>
+          <div class="ia-btn">📅</div>
+          <div class="ia-btn">🏷</div>
+        </div>
+      </div>
+      <div class="inbox-item">
+        <div class="inbox-bullet"></div>
+        <div class="inbox-text">Fix that bug in the app</div>
+        <div class="inbox-actions">
+          <div class="ia-btn">🕒</div>
+          <div class="ia-btn">📅</div>
+          <div class="ia-btn">🏷</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="swipe-hint">
+      <span>← swipe left to delete</span>
+      <span>swipe right to schedule →</span>
+    </div>
+
+    <button class="move-all-btn">📋 Move All to Timeline</button>
+  </div>
+
+  <div class="bottom-nav">
+    <button class="nav-btn active" onclick="go('s-inbox')"><div class="nav-icon">📥</div><div class="nav-lbl">Inbox</div></button>
+    <button class="nav-btn" onclick="go('s-timeline')"><div class="nav-icon">📋</div><div class="nav-lbl">Timeline</div></button>
+    <button class="nav-btn" onclick="go('s-ai')"><div class="nav-icon">✦</div><div class="nav-lbl">AI</div></button>
+    <button class="nav-btn" onclick="go('s-settings')"><div class="nav-icon">⚙</div><div class="nav-lbl">Settings</div></button>
+  </div>
+</div>
+
+<!-- ═══════════════════════════════════
+     S4 — AI COACH
+═══════════════════════════════════ -->
+<div class="screen" id="s-ai">
+  <div class="status"><span>13:42</span><span>⚡ 62%</span></div>
+  <div class="ai-header">
+    <div class="ai-title">AI Coach</div>
+    <div class="ai-sub">Optimize your day</div>
+  </div>
+  <div class="ai-scroll">
+
+    <div class="ai-section-lbl">Today's Insight</div>
+    <div class="ai-alert warn">
+      <div class="ai-alert-top">
+        <div class="ai-alert-icon">⚠️</div>
+        <div class="ai-alert-txt">
+          <h4>30% behind schedule</h4>
+          <p>You skipped the 08:30 block. Two high-priority tasks are at risk. Suggest skipping "Buy groceries" today.</p>
+        </div>
+      </div>
+      <button class="ai-fix-btn">⚡ Fix My Day</button>
+    </div>
+
+    <div class="ai-section-lbl">Smart Suggestions</div>
+    <div class="ai-insights">
+      <div class="ai-ins">
+        <div class="ai-ins-icon">🧠</div>
+        <div class="ai-ins-body">
+          <div class="ai-ins-title">Best deep work: 9–11 AM</div>
+          <div class="ai-ins-sub">Based on your last 14 sessions</div>
+        </div>
+        <div class="ai-ins-arrow">›</div>
+      </div>
+      <div class="ai-ins">
+        <div class="ai-ins-icon">🌧️</div>
+        <div class="ai-ins-body">
+          <div class="ai-ins-title">Rain sound boosts your focus +18%</div>
+          <div class="ai-ins-sub">Auto-applied to study tasks</div>
+        </div>
+        <div class="ai-ins-arrow">›</div>
+      </div>
+      <div class="ai-ins">
+        <div class="ai-ins-icon">🔋</div>
+        <div class="ai-ins-body">
+          <div class="ai-ins-title">You crash after 3 PM</div>
+          <div class="ai-ins-sub">Schedule light tasks post-lunch</div>
+        </div>
+        <div class="ai-ins-arrow">›</div>
+      </div>
+    </div>
+
+    <div class="ai-section-lbl">One-Tap Actions</div>
+    <div class="ai-actions">
+      <button class="ai-act-btn"><div class="ai-act-icon">🔀</div>Rearrange my day</button>
+      <button class="ai-act-btn"><div class="ai-act-icon">🎯</div>Add focus blocks</button>
+      <button class="ai-act-btn"><div class="ai-act-icon">📉</div>Reduce overload</button>
+      <button class="ai-act-btn"><div class="ai-act-icon">⏰</div>Reschedule missed</button>
+    </div>
+
+    <div class="ai-section-lbl">Ask Anything</div>
+    <div class="ai-chat-wrap">
+      <input class="ai-chat-input" placeholder="Ask about your productivity..." />
+      <button class="ai-send">↑</button>
+    </div>
+
+  </div>
+  <div class="bottom-nav">
+    <button class="nav-btn" onclick="go('s-inbox')"><div class="nav-icon">📥</div><div class="nav-lbl">Inbox</div></button>
+    <button class="nav-btn" onclick="go('s-timeline')"><div class="nav-icon">📋</div><div class="nav-lbl">Timeline</div></button>
+    <button class="nav-btn active" onclick="go('s-ai')"><div class="nav-icon">✦</div><div class="nav-lbl">AI</div></button>
+    <button class="nav-btn" onclick="go('s-settings')"><div class="nav-icon">⚙</div><div class="nav-lbl">Settings</div></button>
+  </div>
+</div>
+
+<!-- ═══════════════════════════════════
+     S5 — SETTINGS
+═══════════════════════════════════ -->
+<div class="screen" id="s-settings">
+  <div class="status"><span>13:42</span><span>⚡ 62%</span></div>
+  <div class="set-header">
+    <div class="set-title">Settings</div>
+  </div>
+  <div class="set-scroll">
+
+    <div class="set-section">
+      <div class="set-section-lbl">Focus Mode</div>
+      <div class="set-row">
+        <div class="set-row-icon">🔒</div>
+        <div class="set-row-text"><div class="set-row-label">Hard Focus</div><div class="set-row-sub">Block exit during task</div></div>
+        <div class="toggle on" onclick="this.classList.toggle('on')"></div>
+      </div>
+      <div class="set-row">
+        <div class="set-row-icon">📵</div>
+        <div class="set-row-text"><div class="set-row-label">Block Other Apps</div><div class="set-row-sub">Requires accessibility permission</div></div>
+        <div class="toggle" onclick="this.classList.toggle('on')"></div>
+      </div>
+      <div class="set-row">
+        <div class="set-row-icon">⏳</div>
+        <div class="set-row-text"><div class="set-row-label">Hold to Exit</div><div class="set-row-sub">Hold 3 sec to leave focus</div></div>
+        <div class="toggle on" onclick="this.classList.toggle('on')"></div>
+      </div>
+    </div>
+
+    <div class="set-section">
+      <div class="set-section-lbl">Sound System</div>
+      <div class="sound-cats">
+        <div class="sc-row"><div class="sc-icon">📚</div><div class="sc-cat">Study</div><div class="sc-sound">Rain + Brown Noise</div><div class="sc-edit">✎</div></div>
+        <div class="sc-row"><div class="sc-icon">🏋️</div><div class="sc-cat">Workout</div><div class="sc-sound">Energetic Mix</div><div class="sc-edit">✎</div></div>
+        <div class="sc-row"><div class="sc-icon">🧠</div><div class="sc-cat">Deep Work</div><div class="sc-sound">Ambient / No lyrics</div><div class="sc-edit">✎</div></div>
+        <div class="sc-row"><div class="sc-icon">💼</div><div class="sc-cat">Meeting</div><div class="sc-sound">No sound</div><div class="sc-edit">✎</div></div>
+      </div>
+      <div class="set-row" style="margin-top:8px;">
+        <div class="set-row-icon">🔊</div>
+        <div class="set-row-text"><div class="set-row-label">Auto-Play Sound</div><div class="set-row-sub">Starts when task begins</div></div>
+        <div class="toggle on" onclick="this.classList.toggle('on')"></div>
+      </div>
+      <div class="set-row">
+        <div class="set-row-icon">📉</div>
+        <div class="set-row-text"><div class="set-row-label">Adaptive Volume</div><div class="set-row-sub">Fades after 5 min</div></div>
+        <div class="toggle on" onclick="this.classList.toggle('on')"></div>
+      </div>
+    </div>
+
+    <div class="set-section">
+      <div class="set-section-lbl">Notifications</div>
+      <div class="set-row">
+        <div class="set-row-icon">🔔</div>
+        <div class="set-row-text"><div class="set-row-label">Task Start Alert</div></div>
+        <div class="toggle on" onclick="this.classList.toggle('on')"></div>
+      </div>
+      <div class="set-row">
+        <div class="set-row-icon">☕</div>
+        <div class="set-row-text"><div class="set-row-label">Break Reminder</div></div>
+        <div class="toggle on" onclick="this.classList.toggle('on')"></div>
+      </div>
+      <div class="set-row">
+        <div class="set-row-icon">⚠️</div>
+        <div class="set-row-text"><div class="set-row-label">Missed Task Alert</div></div>
+        <div class="toggle" onclick="this.classList.toggle('on')"></div>
+      </div>
+    </div>
+
+    <div class="set-section">
+      <div class="set-section-lbl">Appearance</div>
+      <div class="set-row">
+        <div class="set-row-icon">🌙</div>
+        <div class="set-row-text"><div class="set-row-label">Theme</div></div>
+        <div class="set-row-right"><div class="set-val">Dark</div><div class="set-arr">›</div></div>
+      </div>
+      <div class="set-row" style="flex-direction:column; align-items:flex-start; gap:10px;">
+        <div style="display:flex; align-items:center; gap:12px; width:100%;">
+          <div class="set-row-icon">🎨</div>
+          <div class="set-row-label">Accent Color</div>
+        </div>
+        <div class="accent-dots">
+          <div class="ac-dot sel" style="background:#ff5f5f;"></div>
+          <div class="ac-dot" style="background:#ff8c42;" onclick="selAccent(this)"></div>
+          <div class="ac-dot" style="background:#5b9fff;" onclick="selAccent(this)"></div>
+          <div class="ac-dot" style="background:#3dffa0;" onclick="selAccent(this)"></div>
+          <div class="ac-dot" style="background:#ffc84a;" onclick="selAccent(this)"></div>
+          <div class="ac-dot" style="background:#c084fc;" onclick="selAccent(this)"></div>
+        </div>
+      </div>
+    </div>
+
+    <div class="set-section">
+      <div class="set-section-lbl">Data</div>
+      <div class="set-row">
+        <div class="set-row-icon">📤</div>
+        <div class="set-row-text"><div class="set-row-label">Export Data</div><div class="set-row-sub">CSV / JSON</div></div>
+        <div class="set-arr">›</div>
+      </div>
+    </div>
+
+    <button class="danger-btn">🗑 Reset All Progress</button>
+    <div style="height:10px;"></div>
+  </div>
+  <div class="bottom-nav">
+    <button class="nav-btn" onclick="go('s-inbox')"><div class="nav-icon">📥</div><div class="nav-lbl">Inbox</div></button>
+    <button class="nav-btn" onclick="go('s-timeline')"><div class="nav-icon">📋</div><div class="nav-lbl">Timeline</div></button>
+    <button class="nav-btn" onclick="go('s-ai')"><div class="nav-icon">✦</div><div class="nav-lbl">AI</div></button>
+    <button class="nav-btn active" onclick="go('s-settings')"><div class="nav-icon">⚙</div><div class="nav-lbl">Settings</div></button>
+  </div>
+</div>
+
+<!-- ═══════════════════════════════════
+     S6 — NEW TASK
+═══════════════════════════════════ -->
+<div class="screen" id="s-new">
+  <div class="status"><span>13:42</span><span>⚡ 62%</span></div>
+  <div class="new-task-header">
+    <div class="back-ico" onclick="go('s-timeline')">←</div>
+    <div class="nt-title">New <span>Task</span></div>
+  </div>
+  <div class="nt-body">
+    <div>
+      <label class="nt-label">Task Name</label>
+      <input class="nt-input" placeholder="What needs doing?" />
+    </div>
+    <div>
+      <label class="nt-label">Category → auto-sets sound</label>
+      <div class="cat-grid">
+        <div class="cat-item sel" onclick="selCat(this)"><div class="ci-icon">📚</div><div class="ci-name">Study</div><div class="ci-sound">♪ Rain / Brown noise</div></div>
+        <div class="cat-item" onclick="selCat(this)"><div class="ci-icon">🏋️</div><div class="ci-name">Workout</div><div class="ci-sound">♪ Energetic beats</div></div>
+        <div class="cat-item" onclick="selCat(this)"><div class="ci-icon">🧠</div><div class="ci-name">Deep Work</div><div class="ci-sound">♪ Ambient no-lyrics</div></div>
+        <div class="cat-item" onclick="selCat(this)"><div class="ci-icon">💼</div><div class="ci-name">Meeting</div><div class="ci-sound">♪ No sound</div></div>
+      </div>
+    </div>
+    <div>
+      <label class="nt-label">When?</label>
+      <div class="time-row">
+        <div class="time-pill"><div class="tp-lbl">Start</div><div class="tp-val">09:00</div></div>
+        <div class="time-pill"><div class="tp-lbl">End</div><div class="tp-val">10:30</div></div>
+      </div>
+    </div>
+    <div>
+      <label class="nt-label">Duration</label>
+      <div class="dur-chips">
+        <div class="dur-chip">15m</div>
+        <div class="dur-chip">30m</div>
+        <div class="dur-chip">45m</div>
+        <div class="dur-chip sel">90m</div>
+        <div class="dur-chip">2h</div>
+      </div>
+    </div>
+    <div>
+      <label class="nt-label">Smart Sound (auto-selected)</label>
+      <div class="sound-preview-card">
+        <div class="sp-icon">🌧️</div>
+        <div class="sp-body">
+          <div class="sp-title">Rain + Brown Noise</div>
+          <div class="sp-sub">Best for Study · Adaptive volume ON</div>
+        </div>
+        <div class="sp-change">Change</div>
+      </div>
+    </div>
+    <button class="create-btn" onclick="go('s-timeline')">Create Task →</button>
+  </div>
+</div>
+
+</div><!-- .phone -->
+
+<script>
+// Navigation
+function go(id) {
+  document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
+  document.getElementById(id).classList.add('active');
+  if (id === 's-focus') startTimer();
+  else stopTimer();
+}
+
+// Timer
+let secs = 18*60+34, timerInt;
+function startTimer() {
+  clearInterval(timerInt);
+  timerInt = setInterval(() => {
+    if (secs > 0) secs--;
+    const m = String(Math.floor(secs/60)).padStart(2,'0');
+    const s = String(secs%60).padStart(2,'0');
+    const el = document.getElementById('td');
+    if (el) el.textContent = m+':'+s;
+    const rp = document.getElementById('rp');
+    if (rp) {
+      const total = 25*60;
+      rp.style.strokeDashoffset = 597 * (secs / total);
+    }
+  }, 1000);
+}
+function stopTimer() { clearInterval(timerInt); }
+
+// Sound chip select (focus)
+function selSound(el) {
+  document.querySelectorAll('.sound-chips-row .s-chip').forEach(c => c.classList.remove('on'));
+  el.classList.add('on');
+}
+
+// Category select (new task)
+function selCat(el) {
+  document.querySelectorAll('.cat-item').forEach(c => c.classList.remove('sel'));
+  el.classList.add('sel');
+}
+
+// Duration select
+document.querySelectorAll('.dur-chip').forEach(c => c.addEventListener('click', function() {
+  document.querySelectorAll('.dur-chip').forEach(x => x.classList.remove('sel'));
+  this.classList.add('sel');
+}));
+
+// Accent color
+function selAccent(el) {
+  document.querySelectorAll('.ac-dot').forEach(d => d.classList.remove('sel'));
+  el.classList.add('sel');
+}
+
+// Inbox add
+document.getElementById('qi').addEventListener('keydown', e => { if (e.key === 'Enter') addInbox(); });
+function addInbox() {
+  const qi = document.getElementById('qi');
+  const val = qi.value.trim();
+  if (!val) return;
+  const list = document.getElementById('inbox-list');
+  const item = document.createElement('div');
+  item.className = 'inbox-item';
+  item.innerHTML = `
+    <div class="inbox-bullet"></div>
+    <div class="inbox-text">${val}</div>
+    <div class="inbox-actions">
+      <div class="ia-btn">🕒</div>
+      <div class="ia-btn">📅</div>
+      <div class="ia-btn">🏷</div>
+    </div>`;
+  list.prepend(item);
+  qi.value = '';
+  qi.focus();
+}
+
+// Toggle (settings) already inline with onclick
+</script>
+</body>
+</html>

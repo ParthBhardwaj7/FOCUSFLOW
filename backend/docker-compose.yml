@@ -1,0 +1,22 @@
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: focusflow-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: postgres
+      # Keep in sync with DATABASE_URL in backend/.env (password part).
+      POSTGRES_PASSWORD: mypassword123
+      POSTGRES_DB: focusflow
+    ports:
+      - '5432:5432'
+    volumes:
+      - focusflow_pg_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U postgres -d focusflow']
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+volumes:
+  focusflow_pg_data:

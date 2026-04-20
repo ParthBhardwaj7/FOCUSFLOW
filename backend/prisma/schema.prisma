@@ -1,0 +1,146 @@
+// FocusFlow MVP domain — auth, tasks, focus sessions (see FOCUSFLOW_MASTER.md §4).
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum FocusSessionOutcome {
+  PENDING
+  COMPLETED
+  SKIPPED
+}
+
+enum TimelineSlotStatus {
+  UPCOMING
+  ACTIVE
+  DONE
+  MISSED
+  SKIPPED
+}
+
+enum MemorySource {
+  NOTE
+  CHAT
+  ONBOARDING
+  TASK_SUMMARY
+  MANUAL
+}
+
+model User {
+  id                    String    @id @default(cuid())
+  email                 String    @unique
+  passwordHash          String
+  emailVerifiedAt       DateTime?
+  onboardingCompletedAt DateTime?
+  timeZone              String?
+  profileSummary        String?   @db.Text
+  createdAt             DateTime  @default(now())
+  updatedAt             DateTime  @updatedAt
+
+  refreshTokens  RefreshToken[]
+  tasks          Task[]
+  focusSessions  FocusSession[]
+  timelineSlots  TimelineSlot[]
+  notes          Note[]
+  memories       UserMemory[]
+}
+
+model TimelineSlot {
+  id           String              @id @default(cuid())
+  userId       String
+  user         User                @relation(fields: [userId], references: [id], onDelete: Cascade)
+  startsAt     DateTime
+  endsAt       DateTime
+  title        String
+  iconKey      String?
+  tag          String?
+  soundLabel   String?
+  status       TimelineSlotStatus  @default(UPCOMING)
+  linkedTaskId String?
+  task         Task?               @relation(fields: [linkedTaskId], references: [id], onDelete: SetNull)
+  sortOrder    Int                 @default(0)
+  createdAt    DateTime            @default(now())
+  updatedAt    DateTime            @updatedAt
+
+  @@index([userId, startsAt])
+}
+
+model RefreshToken {
+  id         String    @id @default(cuid())
+  userId     String
+  user       User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  tokenHash  String    @unique
+  expiresAt  DateTime
+  createdAt  DateTime  @default(now())
+  revokedAt  DateTime?
+  replacedBy String?
+
+  @@index([userId])
+}
+
+model Task {
+  id          String    @id @default(cuid())
+  userId      String
+  user        User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  title       String
+  notes       String?
+  scheduledOn DateTime  @db.Date
+  sortOrder   Int       @default(0)
+  isMit       Boolean   @default(false)
+  archivedAt  DateTime?
+  completedAt DateTime?
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  focusSessions  FocusSession[]
+  timelineSlots  TimelineSlot[]
+
+  @@index([userId, scheduledOn])
+}
+
+model Note {
+  id        String    @id @default(cuid())
+  userId    String
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  title     String    @default("")
+  body      String    @db.Text
+  pinned    Boolean   @default(false)
+  deletedAt DateTime?
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+
+  @@index([userId, updatedAt])
+}
+
+model UserMemory {
+  id        String       @id @default(cuid())
+  userId    String
+  user      User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  content   String       @db.Text
+  source    MemorySource
+  metadata  Json?
+  createdAt DateTime     @default(now())
+
+  @@index([userId, createdAt])
+}
+
+model FocusSession {
+  id                 String               @id @default(cuid())
+  userId             String
+  user               User                 @relation(fields: [userId], references: [id], onDelete: Cascade)
+  taskId             String?
+  task               Task?                @relation(fields: [taskId], references: [id], onDelete: SetNull)
+  startedAt          DateTime             @default(now())
+  endedAt            DateTime?
+  plannedDurationSec Int
+  outcome            FocusSessionOutcome  @default(PENDING)
+  subtasksSnapshot   Json?
+
+  @@index([userId, startedAt])
+  @@index([taskId])
+}
