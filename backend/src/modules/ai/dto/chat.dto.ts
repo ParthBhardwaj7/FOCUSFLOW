@@ -1,5 +1,6 @@
 import { Type } from 'class-transformer';
 import {
+  ArrayMaxSize,
   ArrayMinSize,
   IsArray,
   IsIn,
@@ -20,6 +21,7 @@ export class ChatMessageDto {
 export class ChatDto {
   @IsArray()
   @ArrayMinSize(1)
+  @ArrayMaxSize(64)
   @ValidateNested({ each: true })
   @Type(() => ChatMessageDto)
   messages!: ChatMessageDto[];

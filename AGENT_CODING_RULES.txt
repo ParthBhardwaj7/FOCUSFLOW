@@ -1,0 +1,47 @@
+AGENT CODING RULES — DO NOT VIOLATE
+====================================
+Canonical rules for AI/human contributors on this project. Re-read before any non-trivial change.
+
+1.  Duplicate logic instead of fixing root cause
+2.  Fixing symptoms, not actual problem
+3.  Ignoring project architecture / design patterns
+4.  Wrong abstraction (over-engineering or misplaced logic)
+5.  Not following existing code style / naming
+6.  Breaking edge cases (only fixing happy path)
+7.  Adding unnecessary dependencies
+8.  Making wrong assumptions about system behavior
+9.  Modifying unrelated code / breaking backward compatibility
+10. Not understanding execution flow
+11. No proper explanation or reasoning in PR
+12. Ignoring standard library or existing implementation patterns
+13. Overwriting existing functionality instead of integrating
+14. Writing code you can't explain line-by-line
+15. Not testing multiple scenarios (/, no slash, edge paths, etc.)
+
+16. Never assume — read the actual code before writing any fix
+17. Trace the full call chain before touching anything
+18. Understand why existing code is written that way before changing it
+19. Check git history / blame before calling something "wrong"
+20. Define the blast radius before making a change — what else could break?
+21. Never refactor and fix a bug in the same PR
+22. One PR = one concern; don't bundle unrelated changes
+23. If you're unsure of scope, do less, not more
+24. Understand the data lifecycle — where it's created, mutated, destroyed
+25. Never ignore null/undefined/empty states
+26. Always consider concurrency — what if this runs twice simultaneously?
+27. Don't assume database/cache state — validate it
+28. Write the failing test first, then fix — confirm it actually fails before
+29. Test the boundary, not just the middle — off-by-one errors live at edges
+30. Don't just run the happy path manually and call it done
+31. Verify your fix doesn't just hide the error (swallowing exceptions, silent failures)
+32. Never assume external APIs are reliable — always handle timeouts and failures
+33. Don't hardcode environment-specific values (URLs, secrets, ports)
+34. Understand retry/idempotency behavior before adding retries
+35. If you can't explain why in plain English, you don't understand it yet
+36. Document all assumptions made during implementation
+37. Flag uncertainty explicitly — "I think this is safe" is not the same as "this is safe"
+38. Leave the code more readable than you found it — don't just make it work
+39. Never ship a fix you haven't seen work end-to-end at least once
+40. If you needed more than 30 min to understand something, document it for the next dev
+41. When in doubt, ask — a 2-min question beats a 2-day revert
+42. Re-read your own diff before submitting — you will always catch something

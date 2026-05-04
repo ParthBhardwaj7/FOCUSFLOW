@@ -14,4 +14,9 @@ export class CreateNoteDto {
   @IsOptional()
   @IsBoolean()
   pinned?: boolean;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(500)
+  tags?: string;
 }

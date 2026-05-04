@@ -115,8 +115,7 @@ export class TimelineService {
     await tx.task.update({
       where: { id: taskId },
       data: {
-        completedAt:
-          doneCount > 0 ? (task.completedAt ?? new Date()) : null,
+        completedAt: doneCount > 0 ? (task.completedAt ?? new Date()) : null,
       },
     });
   }

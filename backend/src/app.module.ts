@@ -1,4 +1,10 @@
-import { Module, ValidationPipe, HttpStatus } from '@nestjs/common';
+import {
+  MiddlewareConsumer,
+  Module,
+  NestModule,
+  ValidationPipe,
+  HttpStatus,
+} from '@nestjs/common';
 import { ConfigModule, ConfigService } from '@nestjs/config';
 import { APP_FILTER, APP_GUARD, APP_INTERCEPTOR, APP_PIPE } from '@nestjs/core';
 import { ThrottlerGuard, ThrottlerModule } from '@nestjs/throttler';
@@ -16,7 +22,12 @@ import { AiModule } from './modules/ai/ai.module';
 import { AnalyticsModule } from './modules/analytics/analytics.module';
 import { TimelineModule } from './modules/timeline/timeline.module';
 import { UsersModule } from './modules/users/users.module';
+import { PlannerModule } from './modules/planner/planner.module';
 import { PrismaModule } from './prisma/prisma.module';
+import { MaintenanceMiddleware } from './common/middleware/maintenance.middleware';
+import { AdminModule } from './modules/admin/admin.module';
+import { ClientHooksModule } from './modules/client-hooks/client-hooks.module';
+import { RecordingsModule } from './modules/recordings/recordings.module';
 
 @Module({
   imports: [
@@ -63,6 +74,10 @@ import { PrismaModule } from './prisma/prisma.module';
     TimelineModule,
     AnalyticsModule,
     AiModule,
+    PlannerModule,
+    AdminModule,
+    ClientHooksModule,
+    RecordingsModule,
   ],
   providers: [
     {
@@ -78,8 +93,14 @@ import { PrismaModule } from './prisma/prisma.module';
     },
     { provide: APP_FILTER, useClass: HttpExceptionFilter },
     { provide: APP_INTERCEPTOR, useClass: RequestIdInterceptor },
+    /** Throttle before JWT so limits apply even when auth fails (e.g. missing token). */
     { provide: APP_GUARD, useClass: ThrottlerGuard },
     { provide: APP_GUARD, useClass: JwtAuthGuard },
+    MaintenanceMiddleware,
   ],
 })
-export class AppModule {}
+export class AppModule implements NestModule {
+  configure(consumer: MiddlewareConsumer) {
+    consumer.apply(MaintenanceMiddleware).forRoutes('*');
+  }
+}

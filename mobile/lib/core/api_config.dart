@@ -4,18 +4,41 @@ import 'package:flutter_dotenv/flutter_dotenv.dart';
 
 /// Reads [API_BASE_URL] from `mobile/.env` (loaded in `main.dart`).
 ///
-/// In **debug** builds, falls back to the Android emulator loopback when unset
-/// so `flutter run` works without extra setup. In **release**, set `API_BASE_URL`
-/// in `.env` (or build-time injection); if still unset, uses the same fallback
-/// so the app does not crash (offline productivity still works).
+/// In **debug** / **profile** when unset: Android defaults to the **emulator**
+/// host (`10.0.2.2`). **Physical phones** must set `API_BASE_URL` (e.g. your PC’s
+/// LAN IP) — see [mobile/.env.example]. In **release**, [API_BASE_URL] is required.
 String resolveApiBaseUrl() {
   final raw = dotenv.env['API_BASE_URL']?.trim();
-  if (raw != null && raw.isNotEmpty) return raw;
-  if (kDebugMode) {
-    debugPrint(
-      'API_BASE_URL not set; using Android emulator default. '
-      'Set API_BASE_URL in mobile/.env for devices or production.',
+  if (raw != null && raw.isNotEmpty) {
+    // Avoid Dio joining paths as `host//v1/...` when `.env` has a trailing slash.
+    return raw.replaceAll(RegExp(r'/+$'), '');
+  }
+  if (kReleaseMode) {
+    throw StateError(
+      'API_BASE_URL must be set in mobile/.env for release builds.',
     );
+  }
+  if (kDebugMode) {
+    if (defaultTargetPlatform == TargetPlatform.android) {
+      debugPrint(
+        'API_BASE_URL not set — using http://10.0.2.2:3000 (Android emulator → host). '
+        'On a real phone, create mobile/.env with API_BASE_URL=http://<PC_LAN_IP>:3000 '
+        '(same Wi‑Fi as the phone). Example: API_BASE_URL=http://192.168.1.10:3000',
+      );
+      return 'http://10.0.2.2:3000';
+    }
+    if (defaultTargetPlatform == TargetPlatform.iOS) {
+      debugPrint(
+        'API_BASE_URL not set — using http://127.0.0.1:3000 (iOS simulator → host). '
+        'On a real device, set API_BASE_URL in mobile/.env.',
+      );
+      return 'http://127.0.0.1:3000';
+    }
+    debugPrint(
+      'API_BASE_URL not set — using http://127.0.0.1:3000. '
+      'Set API_BASE_URL in mobile/.env if the API is elsewhere.',
+    );
+    return 'http://127.0.0.1:3000';
   }
   return 'http://10.0.2.2:3000';
 }

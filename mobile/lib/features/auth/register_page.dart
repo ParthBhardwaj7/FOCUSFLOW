@@ -29,9 +29,9 @@ class _RegisterPageState extends ConsumerState<RegisterPage> {
 
     ref.listen(sessionProvider, (prev, next) {
       next.whenOrNull(
-        error: (e, _) => ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(formatDioError(e))),
-        ),
+        error: (e, _) => ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text(formatDioError(e)))),
         data: (user) {
           if (user == null || !context.mounted) return;
           WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -66,10 +66,9 @@ class _RegisterPageState extends ConsumerState<RegisterPage> {
             onPressed: session.isLoading
                 ? null
                 : () async {
-                    await ref.read(sessionProvider.notifier).register(
-                          _email.text.trim(),
-                          _password.text,
-                        );
+                    await ref
+                        .read(sessionProvider.notifier)
+                        .register(_email.text.trim(), _password.text);
                   },
             child: session.isLoading
                 ? const SizedBox(

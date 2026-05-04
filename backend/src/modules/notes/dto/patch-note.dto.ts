@@ -21,6 +21,11 @@ export class PatchNoteDto {
   @IsBoolean()
   pinned?: boolean;
 
+  @IsOptional()
+  @IsString()
+  @MaxLength(500)
+  tags?: string;
+
   /** If sent, must match current row `updatedAt` or API returns 409. */
   @IsOptional()
   @IsDateString()

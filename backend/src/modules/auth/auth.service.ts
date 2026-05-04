@@ -7,13 +7,17 @@ import { ConfigService } from '@nestjs/config';
 import { JwtService } from '@nestjs/jwt';
 import type { SignOptions } from 'jsonwebtoken';
 import * as argon2 from 'argon2';
-import { createHash, randomBytes } from 'node:crypto';
+import { randomBytes } from 'node:crypto';
+import { RefreshTokenScope } from '@prisma/client';
 import { PrismaService } from '../../prisma/prisma.service';
 import { expiryToMs } from '../../common/utils/expiry-ms';
+import { hashRefreshToken } from '../../common/utils/refresh-token-hash';
 import type { AccessTokenPayload } from './strategies/jwt.strategy';
 
-function hashRefreshToken(raw: string): string {
-  return createHash('sha256').update(raw, 'utf8').digest('hex');
+function isSuspended(user: { isBanned: boolean; banExpiresAt: Date | null }) {
+  return (
+    user.isBanned && (!user.banExpiresAt || user.banExpiresAt > new Date())
+  );
 }
 
 @Injectable()
@@ -47,6 +51,9 @@ export class AuthService {
     if (!user) {
       throw new UnauthorizedException('Invalid credentials');
     }
+    if (isSuspended(user)) {
+      throw new UnauthorizedException('Account suspended');
+    }
     const ok = await argon2.verify(user.passwordHash, password);
     if (!ok) {
       throw new UnauthorizedException('Invalid credentials');
@@ -59,13 +66,18 @@ export class AuthService {
     const row = await this.prisma.refreshToken.findUnique({
       where: { tokenHash },
     });
-    if (!row || row.revokedAt || row.expiresAt <= new Date()) {
+    if (
+      !row ||
+      row.revokedAt ||
+      row.expiresAt <= new Date() ||
+      row.scope !== RefreshTokenScope.USER
+    ) {
       throw new UnauthorizedException('Invalid or expired refresh token');
     }
     const user = await this.prisma.user.findUnique({
       where: { id: row.userId },
     });
-    if (!user) {
+    if (!user || isSuspended(user)) {
       throw new UnauthorizedException('Invalid or expired refresh token');
     }
 
@@ -82,6 +94,7 @@ export class AuthService {
         userId: user.id,
         tokenHash: newHash,
         expiresAt,
+        scope: RefreshTokenScope.USER,
       },
     });
 
@@ -111,7 +124,7 @@ export class AuthService {
     const rawRefresh = randomBytes(48).toString('base64url');
     const tokenHash = hashRefreshToken(rawRefresh);
     await this.prisma.refreshToken.create({
-      data: { userId, tokenHash, expiresAt },
+      data: { userId, tokenHash, expiresAt, scope: RefreshTokenScope.USER },
     });
     return this.buildAccessResponse(userId, email, rawRefresh);
   }

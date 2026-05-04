@@ -25,42 +25,36 @@ export class AnalyticsService {
       today = DateTime.now().setZone('UTC').startOf('day');
     }
 
-    const days: Array<{
-      date: string;
-      planned: number;
-      completed: number;
-      rate: number;
-    }> = [];
+    const offsets = Array.from({ length: range }, (_, i) => range - 1 - i);
+    const dayRows = await Promise.all(
+      offsets.map(async (offset) => {
+        const d = today.minus({ days: offset });
+        const on = d.toFormat('yyyy-MM-dd');
+        const dayDate = parseYmdUtcStart(on);
+        const [planned, completed] = await Promise.all([
+          this.prisma.task.count({
+            where: {
+              userId,
+              scheduledOn: dayDate,
+              archivedAt: null,
+            },
+          }),
+          this.prisma.task.count({
+            where: {
+              userId,
+              scheduledOn: dayDate,
+              archivedAt: null,
+              completedAt: { not: null },
+            },
+          }),
+        ]);
+        const rate =
+          planned === 0 ? 0 : Math.round((completed / planned) * 1000) / 10;
+        return { date: on, planned, completed, rate };
+      }),
+    );
 
-    for (let offset = range - 1; offset >= 0; offset -= 1) {
-      const d = today.minus({ days: offset });
-      const on = d.toFormat('yyyy-MM-dd');
-      const dayDate = parseYmdUtcStart(on);
-      const [planned, completed] = await Promise.all([
-        this.prisma.task.count({
-          where: {
-            userId,
-            scheduledOn: dayDate,
-            archivedAt: null,
-          },
-        }),
-        this.prisma.task.count({
-          where: {
-            userId,
-            scheduledOn: dayDate,
-            archivedAt: null,
-            completedAt: { not: null },
-          },
-        }),
-      ]);
-      const rate =
-        planned === 0
-          ? 0
-          : Math.round((completed / planned) * 1000) / 10;
-      days.push({ date: on, planned, completed, rate });
-    }
-
-    return { timeZone: zone, range, days };
+    return { timeZone: zone, range, days: dayRows };
   }
 
   private parseRange(rangeParam?: string): number {

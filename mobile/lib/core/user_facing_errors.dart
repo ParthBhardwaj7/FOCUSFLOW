@@ -1,23 +1,69 @@
+import 'dart:io';
+
 import 'package:dio/dio.dart';
 import 'package:flutter/foundation.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import 'api_config.dart';
 
-/// True if [message] looks like an internal/config error string we should not show verbatim.
-bool _looksTechnical(String message) {
+bool isAuthLoginRequest(DioException e) {
+  final p = e.requestOptions.path;
+  return p.contains('/v1/auth/login') || p.contains('/v1/auth/register');
+}
+
+/// Substrings that must never be shown verbatim to end users.
+bool messageLooksLeakedOrTechnical(String message) {
   final m = message.toUpperCase();
-  return m.contains('LLM_') ||
-      m.contains('DATABASE') ||
-      m.contains('JWT_') ||
-      m.contains('PRISMA') ||
-      m.contains('OPENROUTER') ||
-      m.contains('GROQ') ||
-      m.contains('GEMINI') ||
-      m.contains('API_KEY') ||
-      m.contains('STACK') ||
-      m.contains('ECONNREFUSED') ||
-      m.contains('SQLITE');
+  if (m.isEmpty) return false;
+  const needles = [
+    'API_BASE_URL',
+    '.ENV',
+    'LAN IP',
+    '192.168.',
+    '10.0.2.2',
+    'EMULATOR',
+    'MOBILE/.ENV',
+    'LOCALHOST',
+    ':3000',
+    ' 3000',
+    'FETCH FAILED',
+    'NETWORK REQUEST FAILED',
+    'ECONNREFUSED',
+    'TIMEOUT',
+    'SOCKETEXCEPTION',
+    'FAILED HOST LOOKUP',
+    'CERTIFICATE_VERIFY_FAILED',
+    'HANDSHAKE',
+    'LLM_',
+    'DATABASE',
+    'JWT_',
+    'PRISMA',
+    'OPENROUTER',
+    'GROQ',
+    'GEMINI',
+    'API_KEY',
+    'STACK',
+    'SQLITE',
+    'DIOEXCEPTION',
+    'BASEOPTIONS',
+  ];
+  for (final n in needles) {
+    if (m.contains(n)) return true;
+  }
+  return false;
+}
+
+bool _looksTechnical(String message) {
+  return messageLooksLeakedOrTechnical(message) ||
+      message.toUpperCase().contains('ECONNREFUSED'); // redundant but explicit
+}
+
+String _sanitizeFreeform(String s) {
+  final t = s.trim();
+  if (t.isEmpty) return 'Something went wrong. Please try again.';
+  if (_looksTechnical(t)) return 'Something went wrong. Please try again.';
+  return t;
 }
 
 /// Single entry point for SnackBars, banners, and inline error text.
@@ -25,14 +71,29 @@ String userFacingError(Object error) {
   if (error is AsyncError) {
     return userFacingError(error.error);
   }
+  if (error is StateError) {
+    final msg = error.message;
+    if (msg.contains('API_BASE_URL')) {
+      return "Can't reach FocusFlow right now. Check your internet and try again.";
+    }
+  }
   if (error is DioException) {
     return _dioExceptionMessage(error);
   }
-  final s = error.toString();
-  if (_looksTechnical(s)) {
-    return 'Something went wrong. Please try again.';
+  if (error is PlatformException) {
+    return "That didn't work on this device. Please try again.";
   }
-  return s;
+  if (error is FileSystemException) {
+    return 'Could not read that file. If it was just saved, wait a second and try again.';
+  }
+  if (error is FormatException) {
+    return 'That content could not be read. Try again or use a different file.';
+  }
+  if (error is TypeError) {
+    return 'Saved planner data could not be read for this day. Try again or reset the day.';
+  }
+  final s = error.toString();
+  return _sanitizeFreeform(s);
 }
 
 String _dioExceptionMessage(DioException e) {
@@ -46,7 +107,7 @@ String _dioExceptionMessage(DioException e) {
     case DioExceptionType.receiveTimeout:
       return 'The request took too long. Check your connection and try again.';
     case DioExceptionType.connectionError:
-      return "Can't connect. Check your internet and try again.";
+      return "Can't reach FocusFlow right now. Check your internet and try again.";
     case DioExceptionType.badResponse:
       return _badResponseMessage(e);
     default:
@@ -54,7 +115,7 @@ String _dioExceptionMessage(DioException e) {
   }
   final msg = e.message?.trim();
   if (msg != null && msg.isNotEmpty && !_looksTechnical(msg)) {
-    return msg;
+    return _sanitizeFreeform(msg);
   }
   return 'Something went wrong. Please try again.';
 }
@@ -71,10 +132,13 @@ String _badResponseMessage(DioException e) {
   }
 
   switch (code) {
+    case 401:
+      if (isAuthLoginRequest(e)) {
+        return 'Sign-in failed. Check your email and password.';
+      }
+      return 'Session expired. Please log in again.';
     case 400:
       return 'That request was not accepted. Check your input and try again.';
-    case 401:
-      return 'Sign-in failed. Check your email and password.';
     case 403:
       return "You don't have access to this. Sign in again if the problem continues.";
     case 404:
@@ -98,14 +162,14 @@ String _badResponseMessage(DioException e) {
       }
       if (code != null && code >= 400 && code < 500) {
         if (serverMessage != null && !_looksTechnical(serverMessage)) {
-          return serverMessage;
+          return _sanitizeFreeform(serverMessage);
         }
         return 'Something went wrong. Please try again.';
       }
       break;
   }
   if (serverMessage != null && !_looksTechnical(serverMessage)) {
-    return serverMessage;
+    return _sanitizeFreeform(serverMessage);
   }
   return 'Something went wrong. Please try again.';
 }

@@ -19,9 +19,8 @@ const envSchema = z.object({
   JWT_ACCESS_SECRET: z
     .string()
     .min(32, 'JWT_ACCESS_SECRET must be at least 32 characters'),
-  JWT_REFRESH_SECRET: z
-    .string()
-    .min(32, 'JWT_REFRESH_SECRET must be at least 32 characters'),
+  /** Unused at runtime (refresh tokens are opaque DB rows); kept optional for older `.env` files. */
+  JWT_REFRESH_SECRET: z.string().min(32).optional(),
   /** Parsed by `jsonwebtoken` / `expiryToMs` (suffix: ms|s|m|h|d). */
   JWT_ACCESS_EXPIRES_IN: z.string().default('365d'),
   JWT_REFRESH_EXPIRES_IN: z.string().default('36500d'),
@@ -46,11 +45,23 @@ const envSchema = z.object({
   LLM_API_KEY: z.string().min(1).optional(),
   LLM_MODEL: z.string().min(1).optional(),
   LLM_BASE_URL: z.string().url().optional(),
+
+  /** Falls back to JWT_ACCESS_SECRET when unset. */
+  ADMIN_JWT_ACCESS_SECRET: z.string().min(32).optional(),
+  ADMIN_JWT_ACCESS_EXPIRES_IN: z.string().default('15m'),
+
+  FCM_SERVER_KEY: z.string().min(1).optional(),
+  REDIS_URL: z.string().min(1).optional(),
+  ADMIN_PANEL_URL: z.string().url().optional(),
+  /** Public base URL for uploaded sound files (optional). */
+  SOUND_PUBLIC_BASE_URL: z.string().url().optional(),
 });
 
 export type EnvVars = z.infer<typeof envSchema>;
 
-function stripEmptyOptionalKeys(input: Record<string, unknown>): Record<string, unknown> {
+function stripEmptyOptionalKeys(
+  input: Record<string, unknown>,
+): Record<string, unknown> {
   const out = { ...input };
   /** `.env` often has `KEY=` — Zod optional still receives `""` and fails `.min(1)` / `.url()`. */
   for (const key of [
@@ -61,6 +72,12 @@ function stripEmptyOptionalKeys(input: Record<string, unknown>): Record<string, 
     'SHADOW_DATABASE_URL',
     'SENTRY_DSN',
     'COOKIE_DOMAIN',
+    'JWT_REFRESH_SECRET',
+    'ADMIN_JWT_ACCESS_SECRET',
+    'FCM_SERVER_KEY',
+    'REDIS_URL',
+    'ADMIN_PANEL_URL',
+    'SOUND_PUBLIC_BASE_URL',
   ]) {
     const v = out[key];
     if (typeof v === 'string' && v.trim() === '') {

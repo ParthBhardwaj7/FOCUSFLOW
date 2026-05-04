@@ -74,9 +74,9 @@ class _DeepFocusPageState extends ConsumerState<DeepFocusPage> {
       }
     } catch (e) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(userFacingError(e))),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text(userFacingError(e))));
     }
   }
 
@@ -144,7 +144,7 @@ class _DeepFocusPageState extends ConsumerState<DeepFocusPage> {
       barrierDismissible: false,
       builder: (ctx) => AlertDialog(
         backgroundColor: TimelineTokens.card,
-        title: Text(title, style: const TextStyle(color: TimelineTokens.text)),
+        title: Text(title, style:  TextStyle(color: TimelineTokens.text)),
         content: const Text(
           'You chose this time to focus. Leaving now breaks the promise you made to yourself — '
           'but stopping is still your choice.',
@@ -157,7 +157,9 @@ class _DeepFocusPageState extends ConsumerState<DeepFocusPage> {
           ),
           FilledButton(
             onPressed: () => Navigator.pop(ctx, true),
-            style: FilledButton.styleFrom(backgroundColor: TimelineTokens.accent),
+            style: FilledButton.styleFrom(
+              backgroundColor: TimelineTokens.accent,
+            ),
             child: const Text('Leave anyway'),
           ),
         ],
@@ -212,7 +214,9 @@ class _DeepFocusPageState extends ConsumerState<DeepFocusPage> {
             onPressed: () {
               ScaffoldMessenger.of(context).showSnackBar(
                 const SnackBar(
-                  content: Text('Hold the close button for 3 seconds to leave deep focus.'),
+                  content: Text(
+                    'Hold the close button for 3 seconds to leave deep focus.',
+                  ),
                 ),
               );
             },
@@ -245,7 +249,7 @@ class _DeepFocusPageState extends ConsumerState<DeepFocusPage> {
         );
       },
       child: Scaffold(
-        backgroundColor: TimelineTokens.bg,
+        backgroundColor: TimelineTokens.scaffoldBg(context),
         body: SafeArea(
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -255,11 +259,16 @@ class _DeepFocusPageState extends ConsumerState<DeepFocusPage> {
                 child: Row(
                   children: [
                     Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 12,
+                        vertical: 6,
+                      ),
                       decoration: BoxDecoration(
                         color: TimelineTokens.accent.withValues(alpha: 0.12),
                         borderRadius: BorderRadius.circular(20),
-                        border: Border.all(color: TimelineTokens.accent.withValues(alpha: 0.35)),
+                        border: Border.all(
+                          color: TimelineTokens.accent.withValues(alpha: 0.35),
+                        ),
                       ),
                       child: Row(
                         mainAxisSize: MainAxisSize.min,
@@ -346,7 +355,9 @@ class _DeepFocusPageState extends ConsumerState<DeepFocusPage> {
                                 Text(
                                   'Remaining',
                                   style: TextStyle(
-                                    color: TimelineTokens.muted.withValues(alpha: 0.9),
+                                    color: TimelineTokens.muted.withValues(
+                                      alpha: 0.9,
+                                    ),
                                     fontSize: 12,
                                     fontWeight: FontWeight.w600,
                                     letterSpacing: 0.5,
@@ -365,8 +376,12 @@ class _DeepFocusPageState extends ConsumerState<DeepFocusPage> {
                               onPressed: () => unawaited(_onSkipPressed()),
                               style: OutlinedButton.styleFrom(
                                 foregroundColor: TimelineTokens.text,
-                                side: const BorderSide(color: TimelineTokens.border),
-                                padding: const EdgeInsets.symmetric(vertical: 14),
+                                side: const BorderSide(
+                                  color: TimelineTokens.border,
+                                ),
+                                padding: const EdgeInsets.symmetric(
+                                  vertical: 14,
+                                ),
                               ),
                               child: const Text('Skip'),
                             ),
@@ -378,7 +393,9 @@ class _DeepFocusPageState extends ConsumerState<DeepFocusPage> {
                               style: FilledButton.styleFrom(
                                 backgroundColor: TimelineTokens.accent,
                                 foregroundColor: Colors.white,
-                                padding: const EdgeInsets.symmetric(vertical: 14),
+                                padding: const EdgeInsets.symmetric(
+                                  vertical: 14,
+                                ),
                               ),
                               child: const Text('Done'),
                             ),

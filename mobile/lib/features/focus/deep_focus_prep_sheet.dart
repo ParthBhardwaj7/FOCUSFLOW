@@ -1,15 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
-import '../timeline/timeline_tokens.dart';
 import 'deep_focus_tracks.dart';
 
 /// User-chosen session length and optional bundled track.
 class DeepFocusPrepResult {
-  const DeepFocusPrepResult({
-    required this.durationSec,
-    this.audioAssetPath,
-  });
+  const DeepFocusPrepResult({required this.durationSec, this.audioAssetPath});
 
   final int durationSec;
   final String? audioAssetPath;
@@ -27,7 +23,7 @@ Future<DeepFocusPrepResult?> showDeepFocusPrepSheet(
   return showModalBottomSheet<DeepFocusPrepResult>(
     context: context,
     isScrollControlled: true,
-    backgroundColor: TimelineTokens.surface,
+    backgroundColor: Theme.of(context).colorScheme.surfaceContainerHigh,
     shape: const RoundedRectangleBorder(
       borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
     ),
@@ -95,6 +91,7 @@ class _DeepFocusPrepBodyState extends ConsumerState<_DeepFocusPrepBody> {
   Widget build(BuildContext context) {
     final tracksAsync = ref.watch(deepFocusTracksProvider);
     final bottom = MediaQuery.paddingOf(context).bottom;
+    final cs = Theme.of(context).colorScheme;
 
     return Padding(
       padding: EdgeInsets.fromLTRB(20, 12, 20, 20 + bottom),
@@ -107,7 +104,7 @@ class _DeepFocusPrepBodyState extends ConsumerState<_DeepFocusPrepBody> {
               width: 40,
               height: 4,
               decoration: BoxDecoration(
-                color: TimelineTokens.muted.withValues(alpha: 0.5),
+                color: cs.onSurfaceVariant.withValues(alpha: 0.35),
                 borderRadius: BorderRadius.circular(99),
               ),
             ),
@@ -116,7 +113,7 @@ class _DeepFocusPrepBodyState extends ConsumerState<_DeepFocusPrepBody> {
           Text(
             'Deep focus',
             style: TextStyle(
-              color: TimelineTokens.text,
+              color: cs.onSurface,
               fontSize: 20,
               fontWeight: FontWeight.w800,
               letterSpacing: -0.5,
@@ -127,16 +124,13 @@ class _DeepFocusPrepBodyState extends ConsumerState<_DeepFocusPrepBody> {
             widget.taskTitle,
             maxLines: 2,
             overflow: TextOverflow.ellipsis,
-            style: TextStyle(
-              color: TimelineTokens.muted,
-              fontSize: 14,
-            ),
+            style: TextStyle(color: cs.onSurfaceVariant, fontSize: 14),
           ),
           const SizedBox(height: 20),
           Text(
             'Duration',
             style: TextStyle(
-              color: TimelineTokens.muted,
+              color: cs.onSurfaceVariant,
               fontSize: 11,
               fontWeight: FontWeight.w700,
               letterSpacing: 1.2,
@@ -155,15 +149,15 @@ class _DeepFocusPrepBodyState extends ConsumerState<_DeepFocusPrepBody> {
                 label: Text(label),
                 selected: sel,
                 onSelected: (_) => setState(() => _selectedMin = m),
-                selectedColor: TimelineTokens.accent,
+                selectedColor: cs.primary,
                 labelStyle: TextStyle(
-                  color: sel ? Colors.white : TimelineTokens.text,
+                  color: sel ? cs.onPrimary : cs.onSurface,
                   fontWeight: FontWeight.w700,
                   fontSize: 13,
                 ),
-                backgroundColor: TimelineTokens.card,
+                backgroundColor: cs.surfaceContainerHighest,
                 side: BorderSide(
-                  color: sel ? TimelineTokens.accent : TimelineTokens.border,
+                  color: sel ? cs.primary : cs.outline,
                 ),
               );
             }).toList(),
@@ -172,7 +166,7 @@ class _DeepFocusPrepBodyState extends ConsumerState<_DeepFocusPrepBody> {
           Text(
             'Sound (loops for whole session)',
             style: TextStyle(
-              color: TimelineTokens.muted,
+              color: cs.onSurfaceVariant,
               fontSize: 11,
               fontWeight: FontWeight.w700,
               letterSpacing: 1.2,
@@ -184,16 +178,20 @@ class _DeepFocusPrepBodyState extends ConsumerState<_DeepFocusPrepBody> {
               padding: EdgeInsets.all(16),
               child: Center(child: CircularProgressIndicator()),
             ),
-            error: (err, _) => Text(
-              'Could not load track list: $err',
-              style: TextStyle(color: TimelineTokens.muted),
+            error: (e, _) => Text(
+              'No audio tracks found. Add mp3/m4a files to assets/deep_focus_audio/ and rebuild.',
+              style: TextStyle(
+                color: cs.onSurfaceVariant.withValues(alpha: 0.9),
+                fontSize: 13,
+                height: 1.35,
+              ),
             ),
             data: (tracks) {
               if (tracks.isEmpty) {
                 return Text(
                   'Add audio files to assets/deep_focus_audio/ in the project, then rebuild the app.',
                   style: TextStyle(
-                    color: TimelineTokens.muted.withValues(alpha: 0.95),
+                    color: cs.onSurfaceVariant.withValues(alpha: 0.95),
                     fontSize: 13,
                     height: 1.35,
                   ),
@@ -205,22 +203,38 @@ class _DeepFocusPrepBodyState extends ConsumerState<_DeepFocusPrepBody> {
                   shrinkWrap: true,
                   children: [
                     ListTile(
-                      title: Text('No sound', style: TextStyle(color: TimelineTokens.text)),
+                      title: Text(
+                        'No sound',
+                        style: TextStyle(color: cs.onSurface),
+                      ),
                       selected: _trackPath == null,
-                      selectedTileColor: TimelineTokens.accent.withValues(alpha: 0.12),
+                      selectedTileColor: cs.primary.withValues(
+                        alpha: 0.12,
+                      ),
                       onTap: () => setState(() => _trackPath = null),
                       trailing: _trackPath == null
-                          ? const Icon(Icons.check, color: TimelineTokens.accent)
+                          ? Icon(
+                              Icons.check,
+                              color: cs.primary,
+                            )
                           : null,
                     ),
                     ...tracks.map(
                       (t) => ListTile(
-                        title: Text(t.displayName, style: const TextStyle(color: TimelineTokens.text)),
+                        title: Text(
+                          t.displayName,
+                          style: TextStyle(color: cs.onSurface),
+                        ),
                         selected: _trackPath == t.assetPath,
-                        selectedTileColor: TimelineTokens.accent.withValues(alpha: 0.12),
+                        selectedTileColor: cs.primary.withValues(
+                          alpha: 0.12,
+                        ),
                         onTap: () => setState(() => _trackPath = t.assetPath),
                         trailing: _trackPath == t.assetPath
-                            ? const Icon(Icons.check, color: TimelineTokens.accent)
+                            ? Icon(
+                                Icons.check,
+                                color: cs.primary,
+                              )
                             : null,
                       ),
                     ),
@@ -237,12 +251,15 @@ class _DeepFocusPrepBodyState extends ConsumerState<_DeepFocusPrepBody> {
                   : (_selectedMin * 60).clamp(60, widget.maxDurationSec);
               Navigator.pop(
                 context,
-                DeepFocusPrepResult(durationSec: sec, audioAssetPath: _trackPath),
+                DeepFocusPrepResult(
+                  durationSec: sec,
+                  audioAssetPath: _trackPath,
+                ),
               );
             },
             style: FilledButton.styleFrom(
-              backgroundColor: TimelineTokens.accent,
-              foregroundColor: Colors.white,
+              backgroundColor: cs.primary,
+              foregroundColor: cs.onPrimary,
               padding: const EdgeInsets.symmetric(vertical: 16),
             ),
             child: const Text('Start deep focus'),

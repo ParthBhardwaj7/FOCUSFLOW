@@ -6,6 +6,10 @@ const _kHoldToExit = 'focusflow_hold_to_exit';
 const _kBlockApps = 'focusflow_block_apps';
 const _kFocusSounds = 'focusflow_focus_sounds';
 const _kGentleNudges = 'focusflow_gentle_nudges';
+const _kFocusSoundscape = 'focusflow_focus_soundscape';
+
+/// Standard focus timer sound options (persisted locally).
+enum SoundscapeKind { rain, ocean, whiteNoise, brownNoise }
 
 class FocusPrefsState {
   const FocusPrefsState({
@@ -14,6 +18,7 @@ class FocusPrefsState {
     required this.blockApps,
     required this.focusSounds,
     required this.gentleNudges,
+    required this.focusSoundscape,
   });
 
   final bool hardFocus;
@@ -21,6 +26,7 @@ class FocusPrefsState {
   final bool blockApps;
   final bool focusSounds;
   final bool gentleNudges;
+  final SoundscapeKind focusSoundscape;
 
   FocusPrefsState copyWith({
     bool? hardFocus,
@@ -28,6 +34,7 @@ class FocusPrefsState {
     bool? blockApps,
     bool? focusSounds,
     bool? gentleNudges,
+    SoundscapeKind? focusSoundscape,
   }) {
     return FocusPrefsState(
       hardFocus: hardFocus ?? this.hardFocus,
@@ -35,8 +42,17 @@ class FocusPrefsState {
       blockApps: blockApps ?? this.blockApps,
       focusSounds: focusSounds ?? this.focusSounds,
       gentleNudges: gentleNudges ?? this.gentleNudges,
+      focusSoundscape: focusSoundscape ?? this.focusSoundscape,
     );
   }
+}
+
+SoundscapeKind _readSoundscape(SharedPreferences p) {
+  final raw = p.getInt(_kFocusSoundscape);
+  if (raw == null || raw < 0 || raw >= SoundscapeKind.values.length) {
+    return SoundscapeKind.rain;
+  }
+  return SoundscapeKind.values[raw];
 }
 
 final focusPrefsProvider = FutureProvider<FocusPrefsState>((ref) async {
@@ -46,9 +62,16 @@ final focusPrefsProvider = FutureProvider<FocusPrefsState>((ref) async {
     holdToExit: p.getBool(_kHoldToExit) ?? true,
     blockApps: p.getBool(_kBlockApps) ?? false,
     focusSounds: p.getBool(_kFocusSounds) ?? true,
-    gentleNudges: p.getBool(_kGentleNudges) ?? false,
+    gentleNudges: p.getBool(_kGentleNudges) ?? true,
+    focusSoundscape: _readSoundscape(p),
   );
 });
+
+/// Used by background nudge sync without a [WidgetRef].
+Future<bool> readGentleNudgesEnabled() async {
+  final p = await SharedPreferences.getInstance();
+  return p.getBool(_kGentleNudges) ?? true;
+}
 
 Future<void> saveFocusPrefs(FocusPrefsState s) async {
   final p = await SharedPreferences.getInstance();
@@ -57,4 +80,5 @@ Future<void> saveFocusPrefs(FocusPrefsState s) async {
   await p.setBool(_kBlockApps, s.blockApps);
   await p.setBool(_kFocusSounds, s.focusSounds);
   await p.setBool(_kGentleNudges, s.gentleNudges);
+  await p.setInt(_kFocusSoundscape, s.focusSoundscape.index);
 }

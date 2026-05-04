@@ -1,10 +1,12 @@
 import { Body, Controller, Post } from '@nestjs/common';
+import { Throttle } from '@nestjs/throttler';
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
 import type { JwtUserPayload } from '../../common/decorators/current-user.decorator';
 import { AiService } from './ai.service';
 import { ChatDto } from './dto/chat.dto';
 import { MemoryIngestDto } from './dto/memory-ingest.dto';
 
+@Throttle({ default: { limit: 30, ttl: 60_000 } })
 @Controller({ path: 'ai', version: '1' })
 export class AiController {
   constructor(private readonly ai: AiService) {}

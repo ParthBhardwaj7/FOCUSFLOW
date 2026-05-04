@@ -1,4 +1,12 @@
-import { Body, Controller, Get, Patch } from '@nestjs/common';
+import {
+  Body,
+  Controller,
+  Delete,
+  Get,
+  HttpCode,
+  HttpStatus,
+  Patch,
+} from '@nestjs/common';
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
 import type { JwtUserPayload } from '../../common/decorators/current-user.decorator';
 import { PrismaService } from '../../prisma/prisma.service';
@@ -51,5 +59,12 @@ export class MeController {
         updatedAt: true,
       },
     });
+  }
+
+  /** Permanently removes the user and all related rows (Prisma cascade). */
+  @Delete()
+  @HttpCode(HttpStatus.NO_CONTENT)
+  async deleteMe(@CurrentUser() u: JwtUserPayload): Promise<void> {
+    await this.prisma.user.delete({ where: { id: u.userId } });
   }
 }

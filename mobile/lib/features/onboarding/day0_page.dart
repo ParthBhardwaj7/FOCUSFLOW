@@ -25,17 +25,19 @@ class Day0Page extends ConsumerWidget {
                 'FocusFlow',
                 textAlign: TextAlign.center,
                 style: Theme.of(context).textTheme.headlineMedium?.copyWith(
-                      fontWeight: FontWeight.w800,
-                      letterSpacing: -0.5,
-                    ),
+                  fontWeight: FontWeight.w800,
+                  letterSpacing: -0.5,
+                ),
               ),
               const SizedBox(height: 12),
               Text(
                 'Tell me what to do now.\nOne tap from stuck to timer running.',
                 textAlign: TextAlign.center,
                 style: Theme.of(context).textTheme.bodyLarge?.copyWith(
-                      color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.72),
-                    ),
+                  color: Theme.of(
+                    context,
+                  ).colorScheme.onSurface.withValues(alpha: 0.72),
+                ),
               ),
               const Spacer(),
               FilledButton(
@@ -49,7 +51,9 @@ class Day0Page extends ConsumerWidget {
                   if (!context.mounted || prep == null) return;
                   String? sessionId;
                   try {
-                    final session = await ref.read(focusFlowClientProvider).createFocusSession(
+                    final session = await ref
+                        .read(focusFlowClientProvider)
+                        .createFocusSession(
                           plannedDurationSec: prep.durationSec,
                         );
                     sessionId = session['id'] as String?;

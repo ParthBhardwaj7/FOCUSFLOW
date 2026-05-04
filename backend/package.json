@@ -24,6 +24,9 @@
     "db:generate": "prisma generate",
     "db:migrate": "prisma migrate dev",
     "db:deploy": "prisma migrate deploy",
+    "db:seed": "prisma db seed",
+    "db:dev-admin": "node scripts/ensure-dev-admin.mjs",
+    "verify:admin-api": "node scripts/verify-admin-endpoints.mjs",
     "db:studio": "prisma studio",
     "db:validate": "prisma validate",
     "token:dev": "node scripts/sign-access-token.cjs"
@@ -64,6 +67,7 @@
     "@types/jest": "^30.0.0",
     "@types/jsonwebtoken": "^9.0.10",
     "@types/luxon": "^3.7.1",
+    "@types/multer": "^1.4.12",
     "@types/node": "^24.0.0",
     "@types/passport-jwt": "^4.0.1",
     "@types/supertest": "^7.0.0",

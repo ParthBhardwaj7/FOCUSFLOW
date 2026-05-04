@@ -58,7 +58,7 @@ export class LlmService {
       case 'gemini':
         return this.chatGemini(apiKey, model, messages);
       default:
-        this.logger.warn(`Unsupported LLM provider configured: ${provider}`);
+        this.logger.warn('Unsupported LLM provider configured');
         throw new ServiceUnavailableException(
           "The coach isn't available on the server right now.",
         );
@@ -89,9 +89,7 @@ export class LlmService {
     });
     const raw = await res.text();
     if (!res.ok) {
-      this.logger.warn(
-        `LLM provider HTTP ${res.status}: ${raw.slice(0, 500)}`,
-      );
+      this.logger.warn(`LLM provider HTTP ${res.status}: ${raw.slice(0, 500)}`);
       throw new BadGatewayException(
         'The coach had trouble responding. Please try again in a moment.',
       );
@@ -139,7 +137,7 @@ export class LlmService {
       });
     }
 
-    const url = `https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(model)}:generateContent?key=${encodeURIComponent(apiKey)}`;
+    const url = `https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(model)}:generateContent`;
     const body: Record<string, unknown> = {
       contents,
       generationConfig: { temperature: 0.6 },
@@ -150,7 +148,10 @@ export class LlmService {
 
     const res = await fetch(url, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: {
+        'Content-Type': 'application/json',
+        'x-goog-api-key': apiKey,
+      },
       body: JSON.stringify(body),
     });
     const raw = await res.text();

@@ -1,15 +1,31 @@
+import 'package:flutter/foundation.dart';
+
 import 'models/timeline_slot_model.dart';
 import 'models/user_model.dart';
 
 /// **`true`**: skip login / onboarding / splash; open timeline with **demo slots** (no API token needed).
-/// **`false`**: normal auth; planner data lives in on-device SQLite (offline).
-const bool kDevAuthBypass = false;
+///
+/// Enable only for local debug: `flutter run --dart-define=FF_DEV_AUTH_BYPASS=true`
+/// Release builds must not ship with this enabled ([main.dart] enforces that).
+const bool kDevAuthBypass = bool.fromEnvironment(
+  'FF_DEV_AUTH_BYPASS',
+  defaultValue: false,
+);
+
+/// Call from [main] so a mistaken release define fails fast instead of shipping a back door.
+void assertDevAuthBypassNotEnabledInRelease() {
+  if (kReleaseMode && kDevAuthBypass) {
+    throw StateError(
+      'FF_DEV_AUTH_BYPASS must not be enabled in release builds.',
+    );
+  }
+}
 
 UserModel devBypassUser() => UserModel(
-      id: 'dev-bypass',
-      email: 'dev@local',
-      onboardingCompletedAt: DateTime.utc(2020, 1, 1),
-    );
+  id: 'dev-bypass',
+  email: 'dev@local',
+  onboardingCompletedAt: DateTime.utc(2020, 1, 1),
+);
 
 /// Demo rows for the timeline UI when [kDevAuthBypass] is on (matches backend UTC day bounds).
 List<TimelineSlotModel> devDemoTimelineSlots(String dayOn) {

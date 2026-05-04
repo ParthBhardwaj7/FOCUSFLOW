@@ -29,9 +29,9 @@ class _LoginPageState extends ConsumerState<LoginPage> {
 
     ref.listen(sessionProvider, (prev, next) {
       next.whenOrNull(
-        error: (e, _) => ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(formatDioError(e))),
-        ),
+        error: (e, _) => ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text(formatDioError(e)))),
         data: (user) {
           if (user == null || !context.mounted) return;
           // Backup navigation if GoRouter redirect did not fire in the same frame.
@@ -64,10 +64,9 @@ class _LoginPageState extends ConsumerState<LoginPage> {
             onPressed: session.isLoading
                 ? null
                 : () async {
-                    await ref.read(sessionProvider.notifier).login(
-                          _email.text.trim(),
-                          _password.text,
-                        );
+                    await ref
+                        .read(sessionProvider.notifier)
+                        .login(_email.text.trim(), _password.text);
                   },
             child: session.isLoading
                 ? const SizedBox(

@@ -1,0 +1,8 @@
+{"sessionId":"e5a2af","location":"main.ts:8","message":"Bootstrap starting","data":{"nodeVersion":"v22.22.0","env":"development","databaseUrl":"postgresql://postgres:mypasswo..."},"timestamp":1777107735347,"hypothesisId":"A"}
+{"sessionId":"e5a2af","location":"main.ts:26","message":"About to listen on port","data":{"port":3000},"timestamp":1777107735441,"hypothesisId":"E"}
+{"sessionId":"e5a2af","location":"prisma.service.ts:17","message":"Attempting database connection","data":{"databaseUrl":"postgresql://postgres:mypassword123@localhost:5432..."},"timestamp":1777107735463,"hypothesisId":"A"}
+{"sessionId":"e5a2af","location":"main.ts:15","message":"AppModule created successfully","data":{"hasLogger":true},"timestamp":1777107735438,"hypothesisId":"B"}
+{"sessionId":"e5a2af","location":"prisma.service.ts:25","message":"Database connected successfully","data":{"success":true},"timestamp":1777107735542,"hypothesisId":"A"}
+{"sessionId":"e5a2af","location":"main.ts:33","message":"Server started successfully","data":{"port":3000},"timestamp":1777107735554,"hypothesisId":"E"}
+{"sessionId":"e5a2af","location":"prisma.service.ts:17","message":"Attempting database connection","data":{"databaseUrl":"postgresql://postgres:mypassword123@localhost:5432..."},"timestamp":1777110061111,"hypothesisId":"A"}
+{"sessionId":"e5a2af","location":"prisma.service.ts:25","message":"Database connected successfully","data":{"success":true},"timestamp":1777110061177,"hypothesisId":"A"}

@@ -6,6 +6,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../core/focus_prefs.dart';
+import '../../core/profile_focus_prefs.dart';
 import '../../core/providers.dart';
 import '../../core/session/session_controller.dart';
 import '../../router.dart';
@@ -18,10 +19,10 @@ class _SoundChip {
 }
 
 const _kSoundChips = [
+  _SoundChip('🌧️', 'Rain'),
   _SoundChip('🌊', 'Ocean'),
-  _SoundChip('🔥', 'Bonfire'),
-  _SoundChip('☕', 'Café'),
-  _SoundChip('🌿', 'Forest'),
+  _SoundChip('🤍', 'White noise'),
+  _SoundChip('🟤', 'Brown noise'),
 ];
 
 class FocusPage extends ConsumerStatefulWidget {
@@ -38,7 +39,8 @@ class _FocusPageState extends ConsumerState<FocusPage> {
   Timer? _timer;
   var _soundIndex = 0;
 
-  int get _planned => widget.args.plannedSeconds <= 0 ? 1 : widget.args.plannedSeconds;
+  int get _planned =>
+      widget.args.plannedSeconds <= 0 ? 1 : widget.args.plannedSeconds;
 
   double get _elapsedFraction {
     final e = _planned - _remaining;
@@ -46,7 +48,10 @@ class _FocusPageState extends ConsumerState<FocusPage> {
   }
 
   /// Mock “flow” meter from time-in-block (no extra sensors).
-  int get _flowPct => (74 * _elapsedFraction + 8 * math.sin(_elapsedFraction * math.pi)).round().clamp(12, 98);
+  int get _flowPct =>
+      (74 * _elapsedFraction + 8 * math.sin(_elapsedFraction * math.pi))
+          .round()
+          .clamp(12, 98);
 
   @override
   void initState() {
@@ -57,6 +62,12 @@ class _FocusPageState extends ConsumerState<FocusPage> {
         ref.read(sessionProvider.notifier).completeOnboarding();
       });
     }
+    WidgetsBinding.instance.addPostFrameCallback((_) async {
+      final focus = await ref.read(focusPrefsProvider.future);
+      if (!mounted || !focus.focusSounds) return;
+      final idx = focus.focusSoundscape.index.clamp(0, _kSoundChips.length - 1);
+      setState(() => _soundIndex = idx);
+    });
     _timer = Timer.periodic(const Duration(seconds: 1), (_) {
       if (!mounted) return;
       if (_remaining <= 0) {
@@ -102,16 +113,15 @@ class _FocusPageState extends ConsumerState<FocusPage> {
   Widget build(BuildContext context) {
     final total = _fmt(_planned);
     final chip = _kSoundChips[_soundIndex];
-    final showSoundChips = ref.watch(focusPrefsProvider).maybeWhen(
-          data: (p) => p.focusSounds,
-          orElse: () => true,
-        );
+    final showSoundChips = ref
+        .watch(focusPrefsProvider)
+        .maybeWhen(data: (p) => p.focusSounds, orElse: () => true);
 
     return Scaffold(
-      backgroundColor: TimelineTokens.bg,
+      backgroundColor: TimelineTokens.scaffoldBg(context),
       appBar: AppBar(
-        backgroundColor: TimelineTokens.bg,
-        foregroundColor: TimelineTokens.text,
+        backgroundColor: TimelineTokens.scaffoldBg(context),
+        foregroundColor: TimelineTokens.adaptivePrimaryText(context),
         surfaceTintColor: Colors.transparent,
         title: const Text('Focus'),
         leading: IconButton(
@@ -129,8 +139,8 @@ class _FocusPageState extends ConsumerState<FocusPage> {
                 textAlign: TextAlign.center,
                 maxLines: 2,
                 overflow: TextOverflow.ellipsis,
-                style: const TextStyle(
-                  color: TimelineTokens.text,
+                style: TextStyle(
+                  color: TimelineTokens.adaptivePrimaryText(context),
                   fontWeight: FontWeight.w900,
                   fontSize: 20,
                   letterSpacing: -0.3,
@@ -140,7 +150,8 @@ class _FocusPageState extends ConsumerState<FocusPage> {
               Text(
                 'Block · $total planned',
                 style: TextStyle(
-                  color: TimelineTokens.muted.withValues(alpha: 0.9),
+                  color: TimelineTokens.adaptiveSecondaryText(context)
+                      .withValues(alpha: 0.9),
                   fontSize: 12,
                   fontFamily: 'monospace',
                   letterSpacing: 0.5,
@@ -157,8 +168,8 @@ class _FocusPageState extends ConsumerState<FocusPage> {
                       size: const Size(220, 220),
                       painter: _FocusRingPainter(
                         progress: _elapsedFraction,
-                        accent: TimelineTokens.accent,
-                        track: TimelineTokens.border,
+                        accent: TimelineTokens.primaryAccent(context),
+                        track: TimelineTokens.adaptiveBorder(context),
                       ),
                     ),
                     Column(
@@ -166,8 +177,8 @@ class _FocusPageState extends ConsumerState<FocusPage> {
                       children: [
                         Text(
                           _fmt(_remaining.clamp(0, _planned)),
-                          style: const TextStyle(
-                            color: TimelineTokens.text,
+                          style: TextStyle(
+                            color: TimelineTokens.adaptivePrimaryText(context),
                             fontWeight: FontWeight.w900,
                             fontSize: 36,
                             fontFamily: 'monospace',
@@ -178,7 +189,8 @@ class _FocusPageState extends ConsumerState<FocusPage> {
                         Text(
                           'remaining',
                           style: TextStyle(
-                            color: TimelineTokens.muted.withValues(alpha: 0.85),
+                            color: TimelineTokens.adaptiveSecondaryText(context)
+                                .withValues(alpha: 0.85),
                             fontSize: 11,
                             fontWeight: FontWeight.w600,
                           ),
@@ -193,7 +205,8 @@ class _FocusPageState extends ConsumerState<FocusPage> {
                 Text(
                   'Sound',
                   style: TextStyle(
-                    color: TimelineTokens.muted.withValues(alpha: 0.85),
+                    color: TimelineTokens.adaptiveSecondaryText(context)
+                        .withValues(alpha: 0.85),
                     fontSize: 10,
                     fontWeight: FontWeight.w700,
                     letterSpacing: 1,
@@ -208,22 +221,64 @@ class _FocusPageState extends ConsumerState<FocusPage> {
                     final c = _kSoundChips[i];
                     final sel = i == _soundIndex;
                     return Material(
-                      color: sel ? TimelineTokens.accent.withValues(alpha: 0.2) : TimelineTokens.surface,
+                      color: sel
+                          ? TimelineTokens.primaryAccent(context)
+                              .withValues(alpha: 0.2)
+                          : TimelineTokens.adaptiveSurfacePanel(context),
                       borderRadius: BorderRadius.circular(20),
                       child: InkWell(
                         borderRadius: BorderRadius.circular(20),
-                        onTap: () => setState(() => _soundIndex = i),
+                        onTap: () async {
+                          setState(() => _soundIndex = i);
+                          final kind =
+                              SoundscapeKind.values[i.clamp(
+                                0,
+                                SoundscapeKind.values.length - 1,
+                              )];
+                          final cur = await ref.read(focusPrefsProvider.future);
+                          await saveFocusPrefs(
+                            cur.copyWith(focusSoundscape: kind),
+                          );
+                          ref.invalidate(focusPrefsProvider);
+                          final prof = await ref.read(
+                            profileFocusAnswersProvider.future,
+                          );
+                          if (prof.completed) {
+                            await saveProfileFocusAnswers(
+                              ProfileFocusAnswers(
+                                distraction: prof.distraction,
+                                sound: soundPreferenceFromSoundscapeKind(kind),
+                                commitment: prof.commitment,
+                                completed: true,
+                                firstSessionStarted: prof.firstSessionStarted,
+                              ),
+                            );
+                            ref.invalidate(profileFocusAnswersProvider);
+                          }
+                        },
                         child: Padding(
-                          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 12,
+                            vertical: 8,
+                          ),
                           child: Row(
                             mainAxisSize: MainAxisSize.min,
                             children: [
-                              Text(c.emoji, style: const TextStyle(fontSize: 16)),
+                              Text(
+                                c.emoji,
+                                style: const TextStyle(fontSize: 16),
+                              ),
                               const SizedBox(width: 6),
                               Text(
                                 c.label,
                                 style: TextStyle(
-                                  color: sel ? TimelineTokens.text : TimelineTokens.muted,
+                                  color: sel
+                                      ? TimelineTokens.adaptivePrimaryText(
+                                          context,
+                                        )
+                                      : TimelineTokens.adaptiveSecondaryText(
+                                          context,
+                                        ),
                                   fontWeight: FontWeight.w700,
                                   fontSize: 12,
                                 ),
@@ -250,15 +305,19 @@ class _FocusPageState extends ConsumerState<FocusPage> {
                             Text(
                               '⚡ Flow',
                               style: TextStyle(
-                                color: TimelineTokens.muted.withValues(alpha: 0.9),
+                                color: TimelineTokens.adaptiveSecondaryText(
+                                  context,
+                                ).withValues(
+                                  alpha: 0.9,
+                                ),
                                 fontSize: 12,
                                 fontWeight: FontWeight.w700,
                               ),
                             ),
                             Text(
                               '$_flowPct%',
-                              style: const TextStyle(
-                                color: TimelineTokens.blue,
+                              style: TextStyle(
+                                color: Theme.of(context).colorScheme.secondary,
                                 fontSize: 13,
                                 fontWeight: FontWeight.w800,
                               ),
@@ -271,8 +330,12 @@ class _FocusPageState extends ConsumerState<FocusPage> {
                           child: LinearProgressIndicator(
                             value: _flowPct / 100,
                             minHeight: 8,
-                            backgroundColor: TimelineTokens.border,
-                            color: TimelineTokens.blue.withValues(alpha: 0.85),
+                            backgroundColor:
+                                TimelineTokens.adaptiveBorder(context),
+                            color: Theme.of(context)
+                                .colorScheme
+                                .secondary
+                                .withValues(alpha: 0.9),
                           ),
                         ),
                         const SizedBox(height: 4),
@@ -281,7 +344,8 @@ class _FocusPageState extends ConsumerState<FocusPage> {
                               ? 'Preview: ${chip.emoji} ${chip.label} (Deep Focus can loop audio)'
                               : 'Sound chips hidden in Settings → Focus soundscapes',
                           style: TextStyle(
-                            color: TimelineTokens.muted.withValues(alpha: 0.75),
+                            color: TimelineTokens.adaptiveSecondaryText(context)
+                                .withValues(alpha: 0.75),
                             fontSize: 10,
                           ),
                         ),
@@ -297,8 +361,11 @@ class _FocusPageState extends ConsumerState<FocusPage> {
                     child: OutlinedButton(
                       onPressed: _pauseToTimeline,
                       style: OutlinedButton.styleFrom(
-                        foregroundColor: TimelineTokens.text,
-                        side: const BorderSide(color: TimelineTokens.border2),
+                        foregroundColor:
+                            TimelineTokens.adaptivePrimaryText(context),
+                        side: BorderSide(
+                          color: TimelineTokens.adaptiveBorder2(context),
+                        ),
                         padding: const EdgeInsets.symmetric(vertical: 14),
                       ),
                       child: const Text('Pause'),
@@ -310,8 +377,10 @@ class _FocusPageState extends ConsumerState<FocusPage> {
                     child: FilledButton(
                       onPressed: () => _end('COMPLETED'),
                       style: FilledButton.styleFrom(
-                        backgroundColor: TimelineTokens.accent,
-                        foregroundColor: Colors.black,
+                        backgroundColor:
+                            Theme.of(context).colorScheme.primary,
+                        foregroundColor:
+                            Theme.of(context).colorScheme.onPrimary,
                         padding: const EdgeInsets.symmetric(vertical: 14),
                       ),
                       child: const Text('Done'),
@@ -322,8 +391,11 @@ class _FocusPageState extends ConsumerState<FocusPage> {
                     child: OutlinedButton(
                       onPressed: () => _end('SKIPPED'),
                       style: OutlinedButton.styleFrom(
-                        foregroundColor: TimelineTokens.text,
-                        side: const BorderSide(color: TimelineTokens.border2),
+                        foregroundColor:
+                            TimelineTokens.adaptivePrimaryText(context),
+                        side: BorderSide(
+                          color: TimelineTokens.adaptiveBorder2(context),
+                        ),
                         padding: const EdgeInsets.symmetric(vertical: 14),
                       ),
                       child: const Text('Skip'),

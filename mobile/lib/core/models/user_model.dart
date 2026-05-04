@@ -28,19 +28,21 @@ class UserModel extends Equatable {
           : null,
       timeZone: j['timeZone'] as String?,
       profileSummary: j['profileSummary'] as String?,
-      createdAt: j['createdAt'] != null ? DateTime.tryParse(j['createdAt'] as String) : null,
+      createdAt: j['createdAt'] != null
+          ? DateTime.tryParse(j['createdAt'] as String)
+          : null,
     );
   }
 
   Map<String, dynamic> toJson() => {
-        'id': id,
-        'email': email,
-        if (onboardingCompletedAt != null)
-          'onboardingCompletedAt': onboardingCompletedAt!.toUtc().toIso8601String(),
-        if (timeZone != null) 'timeZone': timeZone,
-        if (profileSummary != null) 'profileSummary': profileSummary,
-        if (createdAt != null) 'createdAt': createdAt!.toUtc().toIso8601String(),
-      };
+    'id': id,
+    'email': email,
+    if (onboardingCompletedAt != null)
+      'onboardingCompletedAt': onboardingCompletedAt!.toUtc().toIso8601String(),
+    if (timeZone != null) 'timeZone': timeZone,
+    if (profileSummary != null) 'profileSummary': profileSummary,
+    if (createdAt != null) 'createdAt': createdAt!.toUtc().toIso8601String(),
+  };
 
   UserModel copyWith({
     DateTime? onboardingCompletedAt,
@@ -51,7 +53,8 @@ class UserModel extends Equatable {
     return UserModel(
       id: id,
       email: email,
-      onboardingCompletedAt: onboardingCompletedAt ?? this.onboardingCompletedAt,
+      onboardingCompletedAt:
+          onboardingCompletedAt ?? this.onboardingCompletedAt,
       timeZone: timeZone ?? this.timeZone,
       profileSummary: profileSummary ?? this.profileSummary,
       createdAt: createdAt ?? this.createdAt,
@@ -59,6 +62,12 @@ class UserModel extends Equatable {
   }
 
   @override
-  List<Object?> get props =>
-      [id, email, onboardingCompletedAt, timeZone, profileSummary, createdAt];
+  List<Object?> get props => [
+    id,
+    email,
+    onboardingCompletedAt,
+    timeZone,
+    profileSummary,
+    createdAt,
+  ];
 }

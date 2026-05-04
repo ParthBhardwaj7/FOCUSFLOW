@@ -8,7 +8,8 @@ DateTime parseLocalYmd(String dayOn) {
   return DateTime(int.parse(p[0]), int.parse(p[1]), int.parse(p[2]));
 }
 
-String formatLocalYmd(DateTime localDate) => DateFormat('yyyy-MM-dd').format(localDate);
+String formatLocalYmd(DateTime localDate) =>
+    DateFormat('yyyy-MM-dd').format(localDate);
 
 /// Today’s calendar date in the device’s local timezone (`YYYY-MM-DD`).
 String todayLocalYmdString() => formatLocalYmd(DateTime.now());

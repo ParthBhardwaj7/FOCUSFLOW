@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
+import '../../core/api_config.dart';
 import '../../core/providers.dart';
 import '../../core/user_facing_errors.dart';
 import '../timeline/timeline_tokens.dart';
@@ -40,7 +41,9 @@ class _NoteEditorPageState extends ConsumerState<NoteEditorPage> {
       _serverId = widget.noteId;
       WidgetsBinding.instance.addPostFrameCallback((_) => _load());
     } else {
-      WidgetsBinding.instance.addPostFrameCallback((_) => _createDraftAndReplace());
+      WidgetsBinding.instance.addPostFrameCallback(
+        (_) => _createDraftAndReplace(),
+      );
     }
     _title.addListener(_onFieldChanged);
     _body.addListener(_onFieldChanged);
@@ -58,6 +61,31 @@ class _NoteEditorPageState extends ConsumerState<NoteEditorPage> {
         _loading = false;
       });
       context.pushReplacement('/inbox/notes/${n.id}');
+    } on DioException catch (e) {
+      if (!mounted) return;
+      if (isRecoverableNetworkDioError(e)) {
+        setState(() {
+          _loadError = null;
+          _loading = false;
+        });
+        context.go('/inbox');
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          if (!context.mounted) return;
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text(
+                "You're offline — capture from Inbox; notes save locally and sync when you're back online.",
+              ),
+              behavior: SnackBarBehavior.floating,
+            ),
+          );
+        });
+        return;
+      }
+      setState(() {
+        _loadError = userFacingError(e);
+        _loading = false;
+      });
     } catch (e) {
       if (!mounted) return;
       setState(() {
@@ -107,7 +135,9 @@ class _NoteEditorPageState extends ConsumerState<NoteEditorPage> {
     if (id == null || updatedAt == null || _saving) return;
     setState(() => _saving = true);
     try {
-      final n = await ref.read(focusFlowClientProvider).updateNote(
+      final n = await ref
+          .read(focusFlowClientProvider)
+          .updateNote(
             id,
             title: _title.text,
             body: _body.text,
@@ -132,16 +162,16 @@ class _NoteEditorPageState extends ConsumerState<NoteEditorPage> {
       if (e.response?.statusCode == 409) {
         await _showConflictReload();
       } else {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(userFacingError(e))),
-        );
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text(userFacingError(e))));
       }
     } catch (e) {
       if (!mounted) return;
       setState(() => _saving = false);
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(userFacingError(e))),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text(userFacingError(e))));
     }
   }
 
@@ -150,7 +180,9 @@ class _NoteEditorPageState extends ConsumerState<NoteEditorPage> {
   Future<void> _maybeIngestMemory() async {
     final snippet = '${_title.text.trim()}\n${_body.text.trim()}'.trim();
     if (snippet.length < 40) return;
-    final clip = snippet.length > 800 ? '${snippet.substring(0, 800)}…' : snippet;
+    final clip = snippet.length > 800
+        ? '${snippet.substring(0, 800)}…'
+        : snippet;
     final sig = clip;
     if (sig == _lastIngestSignature) return;
     final now = DateTime.now();
@@ -159,10 +191,9 @@ class _NoteEditorPageState extends ConsumerState<NoteEditorPage> {
       return;
     }
     try {
-      await ref.read(focusFlowClientProvider).ingestMemory(
-            content: 'Note update: $clip',
-            source: 'NOTE',
-          );
+      await ref
+          .read(focusFlowClientProvider)
+          .ingestMemory(content: 'Note update: $clip', source: 'NOTE');
       if (!mounted) return;
       _lastMemoryIngestAt = DateTime.now();
       _lastIngestSignature = sig;
@@ -174,9 +205,14 @@ class _NoteEditorPageState extends ConsumerState<NoteEditorPage> {
       context: context,
       builder: (ctx) => AlertDialog(
         title: const Text('Note changed elsewhere'),
-        content: const Text('Reload the latest version? Your unsaved edits will be lost.'),
+        content: const Text(
+          'Reload the latest version? Your unsaved edits will be lost.',
+        ),
         actions: [
-          TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Cancel')),
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: const Text('Cancel'),
+          ),
           FilledButton(
             onPressed: () {
               Navigator.pop(ctx);
@@ -202,7 +238,10 @@ class _NoteEditorPageState extends ConsumerState<NoteEditorPage> {
         title: const Text('Discard changes?'),
         content: const Text('You have unsaved edits.'),
         actions: [
-          TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Stay')),
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: const Text('Stay'),
+          ),
           FilledButton(
             onPressed: () => Navigator.pop(ctx, true),
             child: const Text('Discard'),
@@ -232,28 +271,35 @@ class _NoteEditorPageState extends ConsumerState<NoteEditorPage> {
         }
       },
       child: Scaffold(
-        backgroundColor: TimelineTokens.bg,
+        backgroundColor: TimelineTokens.scaffoldBg(context),
         appBar: AppBar(
-          backgroundColor: TimelineTokens.bg,
+          backgroundColor: TimelineTokens.scaffoldBg(context),
           surfaceTintColor: Colors.transparent,
           title: Text(
             widget.noteId == null && _serverId == null ? 'New note' : 'Note',
-            style: const TextStyle(color: TimelineTokens.text),
+            style: TextStyle(color: TimelineTokens.adaptivePrimaryText(context)),
           ),
           actions: [
             if (_saving)
-              const Padding(
-                padding: EdgeInsets.only(right: 12),
+              Padding(
+                padding: const EdgeInsets.only(right: 12),
                 child: Center(
                   child: SizedBox(
                     width: 22,
                     height: 22,
-                    child: CircularProgressIndicator(strokeWidth: 2),
+                    child: CircularProgressIndicator(
+                      strokeWidth: 2,
+                      color: Theme.of(context).colorScheme.primary,
+                    ),
                   ),
                 ),
               )
             else if (!_dirty && !_loading)
-              Icon(Icons.cloud_done_outlined, color: TimelineTokens.muted.withValues(alpha: 0.9))
+              Icon(
+                Icons.cloud_done_outlined,
+                color: TimelineTokens.adaptiveSecondaryText(context)
+                    .withValues(alpha: 0.9),
+              )
             else if (_dirty)
               TextButton(
                 onPressed: _loading || _serverId == null ? null : _saveNow,
@@ -265,50 +311,61 @@ class _NoteEditorPageState extends ConsumerState<NoteEditorPage> {
             ? Center(
                 child: Padding(
                   padding: const EdgeInsets.all(24),
-                  child: Text(_loadError!, style: const TextStyle(color: TimelineTokens.text)),
+                  child: Text(
+                    _loadError!,
+                    style: TextStyle(
+                      color: TimelineTokens.adaptivePrimaryText(context),
+                    ),
+                  ),
                 ),
               )
             : _loading
-                ? const Center(child: CircularProgressIndicator())
-                : ListView(
-                    padding: const EdgeInsets.fromLTRB(16, 8, 16, 32),
-                    children: [
-                      TextField(
-                        controller: _title,
-                        style: const TextStyle(
-                          color: TimelineTokens.text,
-                          fontSize: 22,
-                          fontWeight: FontWeight.w700,
-                        ),
-                        decoration: InputDecoration(
-                          hintText: 'Title',
-                          hintStyle: TextStyle(
-                            color: TimelineTokens.muted.withValues(alpha: 0.85),
-                            fontWeight: FontWeight.w600,
-                          ),
-                          border: InputBorder.none,
-                        ),
+            ? Center(
+                child: CircularProgressIndicator(
+                  color: Theme.of(context).colorScheme.primary,
+                ),
+              )
+            : ListView(
+                padding: const EdgeInsets.fromLTRB(16, 8, 16, 32),
+                children: [
+                  TextField(
+                    controller: _title,
+                    style: TextStyle(
+                      color: TimelineTokens.adaptivePrimaryText(context),
+                      fontSize: 22,
+                      fontWeight: FontWeight.w700,
+                    ),
+                    decoration: InputDecoration(
+                      hintText: 'Title',
+                      hintStyle: TextStyle(
+                        color: TimelineTokens.adaptiveSecondaryText(context)
+                            .withValues(alpha: 0.85),
+                        fontWeight: FontWeight.w600,
                       ),
-                      const SizedBox(height: 8),
-                      TextField(
-                        controller: _body,
-                        minLines: 12,
-                        maxLines: 40,
-                        style: const TextStyle(
-                          color: TimelineTokens.text,
-                          fontSize: 16,
-                          height: 1.45,
-                        ),
-                        decoration: InputDecoration(
-                          hintText: 'Start writing…',
-                          hintStyle: TextStyle(
-                            color: TimelineTokens.muted.withValues(alpha: 0.85),
-                          ),
-                          border: InputBorder.none,
-                        ),
-                      ),
-                    ],
+                      border: InputBorder.none,
+                    ),
                   ),
+                  const SizedBox(height: 8),
+                  TextField(
+                    controller: _body,
+                    minLines: 12,
+                    maxLines: 40,
+                    style: TextStyle(
+                      color: TimelineTokens.adaptivePrimaryText(context),
+                      fontSize: 16,
+                      height: 1.45,
+                    ),
+                    decoration: InputDecoration(
+                      hintText: 'Start writing…',
+                      hintStyle: TextStyle(
+                        color: TimelineTokens.adaptiveSecondaryText(context)
+                            .withValues(alpha: 0.85),
+                      ),
+                      border: InputBorder.none,
+                    ),
+                  ),
+                ],
+              ),
       ),
     );
   }

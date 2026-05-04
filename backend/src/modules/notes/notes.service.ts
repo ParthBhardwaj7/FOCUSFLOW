@@ -1,11 +1,16 @@
 import {
+  BadRequestException,
   ConflictException,
   ForbiddenException,
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
+import { createReadStream, existsSync } from 'fs';
+import { mkdir, writeFile } from 'fs/promises';
+import { join } from 'path';
 import { PrismaService } from '../../prisma/prisma.service';
 import type { CreateNoteDto } from './dto/create-note.dto';
+import type { CreateVoiceNoteDto } from './dto/create-voice-note.dto';
 import type { PatchNoteDto } from './dto/patch-note.dto';
 
 @Injectable()
@@ -32,9 +37,70 @@ export class NotesService {
         userId,
         title: dto.title ?? '',
         body: dto.body ?? '',
+        tags: dto.tags ?? '',
         pinned: dto.pinned ?? false,
       },
     });
+  }
+
+  /**
+   * Creates a voice note with uploaded audio stored under `uploads/inbox-voice/{userId}/{noteId}.m4a`.
+   */
+  async createWithVoice(
+    userId: string,
+    dto: CreateVoiceNoteDto,
+    file: Express.Multer.File | undefined,
+  ) {
+    if (!file?.buffer?.length) {
+      throw new BadRequestException('Audio file is required');
+    }
+    const title = (dto.title ?? '').trim() || 'Voice note';
+    const transcript = (dto.transcript ?? '').trim();
+    let tags = (dto.tags ?? '').trim();
+    if (
+      !tags
+        .split(',')
+        .map((t) => t.trim())
+        .includes('Voice')
+    ) {
+      tags = tags.length ? `${tags},Voice` : 'Voice';
+    }
+
+    const note = await this.prisma.note.create({
+      data: {
+        userId,
+        title,
+        body: transcript,
+        tags,
+        pinned: false,
+      },
+    });
+
+    const dir = join(process.cwd(), 'uploads', 'inbox-voice', userId);
+    await mkdir(dir, { recursive: true });
+    const ext = file.mimetype?.includes('mpeg') ? 'mp3' : 'm4a';
+    const rel = join('uploads', 'inbox-voice', userId, `${note.id}.${ext}`);
+    const abs = join(process.cwd(), rel);
+    await writeFile(abs, file.buffer);
+
+    return this.prisma.note.update({
+      where: { id: note.id },
+      data: { audioKey: rel },
+    });
+  }
+
+  async streamAudio(userId: string, noteId: string) {
+    const n = await this.prisma.note.findUnique({ where: { id: noteId } });
+    if (!n || n.deletedAt) throw new NotFoundException('Note not found');
+    if (n.userId !== userId) throw new ForbiddenException();
+    if (!n.audioKey?.length)
+      throw new NotFoundException('No audio for this note');
+
+    const abs = join(process.cwd(), n.audioKey);
+    if (!existsSync(abs)) throw new NotFoundException('Audio file missing');
+
+    const stream = createReadStream(abs);
+    return { stream, mime: 'audio/mp4' };
   }
 
   async update(userId: string, noteId: string, dto: PatchNoteDto) {
@@ -51,7 +117,9 @@ export class NotesService {
       if (Number.isNaN(expected.getTime())) {
         throw new ConflictException('Invalid expectedUpdatedAt');
       }
-      const driftMs = Math.abs(existing.updatedAt.getTime() - expected.getTime());
+      const driftMs = Math.abs(
+        existing.updatedAt.getTime() - expected.getTime(),
+      );
       if (driftMs > 1500) {
         throw new ConflictException('Note was modified elsewhere');
       }
@@ -62,6 +130,7 @@ export class NotesService {
       data: {
         ...(dto.title !== undefined ? { title: dto.title } : {}),
         ...(dto.body !== undefined ? { body: dto.body } : {}),
+        ...(dto.tags !== undefined ? { tags: dto.tags } : {}),
         ...(dto.pinned !== undefined ? { pinned: dto.pinned } : {}),
       },
     });

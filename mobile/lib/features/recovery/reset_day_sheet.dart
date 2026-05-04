@@ -17,14 +17,18 @@ Future<ResetDayChoice?> showResetDaySheet(BuildContext context) {
         children: [
           Text(
             'Reset your day',
-            style: Theme.of(ctx).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w800),
+            style: Theme.of(
+              ctx,
+            ).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w800),
           ),
           const SizedBox(height: 8),
           Text(
             'Pick a forward path — no guilt, just next steps.',
             style: Theme.of(ctx).textTheme.bodyMedium?.copyWith(
-                  color: Theme.of(ctx).colorScheme.onSurface.withValues(alpha: 0.65),
-                ),
+              color: Theme.of(
+                ctx,
+              ).colorScheme.onSurface.withValues(alpha: 0.65),
+            ),
           ),
           const SizedBox(height: 20),
           FilledButton.tonal(

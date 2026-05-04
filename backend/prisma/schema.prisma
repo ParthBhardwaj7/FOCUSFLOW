@@ -31,6 +31,45 @@ enum MemorySource {
   MANUAL
 }
 
+enum UserRole {
+  USER
+  ADMIN
+  SUPERADMIN
+}
+
+enum UserPlan {
+  FREE
+  PRO
+}
+
+enum RefreshTokenScope {
+  USER
+  ADMIN
+}
+
+enum ErrorResolutionStatus {
+  UNRESOLVED
+  IN_PROGRESS
+  RESOLVED
+}
+
+enum PushTargetType {
+  ALL
+  SPECIFIC
+  SEGMENT
+}
+
+enum PushDevicePlatform {
+  IOS
+  ANDROID
+}
+
+enum InsightMood {
+  POSITIVE
+  NEUTRAL
+  WARNING
+}
+
 model User {
   id                    String    @id @default(cuid())
   email                 String    @unique
@@ -42,12 +81,51 @@ model User {
   createdAt             DateTime  @default(now())
   updatedAt             DateTime  @updatedAt
 
+  role                  UserRole  @default(USER)
+  displayName           String?
+  username              String?   @unique
+  avatarUrl             String?
+  isBanned              Boolean   @default(false)
+  banReason             String?
+  banExpiresAt          DateTime?
+  plan                  UserPlan  @default(FREE)
+  subscriptionExpiresAt DateTime?
+  lastActiveAt          DateTime?
+  deviceOs              String?
+  appVersion            String?
+
   refreshTokens  RefreshToken[]
   tasks          Task[]
   focusSessions  FocusSession[]
   timelineSlots  TimelineSlot[]
   notes          Note[]
   memories       UserMemory[]
+  plannerDays    PlannerDaySnapshot[]
+
+  errorLogs        ErrorLog[]      @relation("UserErrors")
+  pushDevices      PushDevice[]
+  aiCoachLogs      AiCoachLog[]
+  auditLogs        AuditLog[]      @relation("AdminAuditActor")
+  resolvedErrors   ErrorLog[]      @relation("ErrorResolvedBy")
+  featureFlagUpdates FeatureFlag[] @relation("FeatureFlagUpdatedBy")
+  appConfigUpdates   AppConfig[]   @relation("AppConfigUpdatedBy")
+  pushNotificationsCreated PushNotification[] @relation("PushNotificationCreator")
+  aiSuggestionsCreated     AiSuggestion[]     @relation("AiSuggestionCreator")
+  categoriesCreated        Category[]         @relation("CategoryCreatedBy")
+  soundsCreated            Sound[]            @relation("SoundCreatedBy")
+}
+
+/// Offline-first planner mirror: one JSON blob per calendar day (survives app reinstall until account delete).
+model PlannerDaySnapshot {
+  id        String   @id @default(cuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  dayOn     DateTime @db.Date
+  slots     Json
+  updatedAt DateTime @updatedAt
+
+  @@unique([userId, dayOn])
+  @@index([userId, dayOn])
 }
 
 model TimelineSlot {
@@ -71,16 +149,211 @@ model TimelineSlot {
 }
 
 model RefreshToken {
-  id         String    @id @default(cuid())
+  id         String             @id @default(cuid())
   userId     String
-  user       User      @relation(fields: [userId], references: [id], onDelete: Cascade)
-  tokenHash  String    @unique
+  user       User               @relation(fields: [userId], references: [id], onDelete: Cascade)
+  tokenHash  String             @unique
   expiresAt  DateTime
-  createdAt  DateTime  @default(now())
+  createdAt  DateTime           @default(now())
   revokedAt  DateTime?
   replacedBy String?
+  scope      RefreshTokenScope  @default(USER)
 
   @@index([userId])
+}
+
+model ErrorLog {
+  id            String                  @id @default(cuid())
+  userId        String?
+  user          User?                   @relation("UserErrors", fields: [userId], references: [id], onDelete: SetNull)
+  errorType     String
+  errorMessage  String                  @db.Text
+  screen        String?
+  appVersion    String?
+  deviceOs      String?
+  fingerprint   String
+  status        ErrorResolutionStatus   @default(UNRESOLVED)
+  internalNote  String?                 @db.Text
+  assignedTo    String?
+  resolvedById  String?
+  resolvedBy    User?                   @relation("ErrorResolvedBy", fields: [resolvedById], references: [id], onDelete: SetNull)
+  resolvedAt    DateTime?
+  createdAt     DateTime                @default(now())
+
+  @@index([fingerprint, createdAt])
+  @@index([userId, createdAt])
+  @@index([status, createdAt])
+}
+
+model FeatureFlag {
+  id                   String    @id @default(cuid())
+  key                  String    @unique
+  isEnabled            Boolean   @default(false)
+  rolloutPercentage    Int       @default(0)
+  enabledForUserIds    String[]  @default([])
+  description          String?   @db.Text
+  scheduledEnableAt    DateTime?
+  scheduledDisableAt   DateTime?
+  updatedByUserId      String?
+  updatedBy            User?     @relation("FeatureFlagUpdatedBy", fields: [updatedByUserId], references: [id], onDelete: SetNull)
+  updatedAt            DateTime  @updatedAt
+  createdAt            DateTime  @default(now())
+}
+
+model AppConfig {
+  id              String   @id @default(cuid())
+  key             String   @unique
+  value           String   @db.Text
+  description     String?  @db.Text
+  isPublic        Boolean  @default(false)
+  updatedByUserId String?
+  updatedBy       User?    @relation("AppConfigUpdatedBy", fields: [updatedByUserId], references: [id], onDelete: SetNull)
+  updatedAt       DateTime @updatedAt
+  createdAt       DateTime @default(now())
+}
+
+model AuditLog {
+  id          String   @id @default(cuid())
+  adminUserId String
+  admin       User     @relation("AdminAuditActor", fields: [adminUserId], references: [id], onDelete: Cascade)
+  action      String
+  targetType  String
+  targetId    String?
+  oldValue    Json?
+  newValue    Json?
+  ipAddress   String?
+  createdAt   DateTime @default(now())
+
+  @@index([adminUserId, createdAt])
+  @@index([action, createdAt])
+}
+
+model AdminFailedLogin {
+  id              String   @id @default(cuid())
+  emailNormalized String
+  ipAddress       String
+  createdAt       DateTime @default(now())
+
+  @@index([emailNormalized, createdAt])
+  @@index([ipAddress, createdAt])
+}
+
+model ErrorAlertConfig {
+  id                String   @id @default(cuid())
+  name              String   @unique
+  maxOccurrences    Int      @default(10)
+  windowMinutes     Int      @default(60)
+  slackWebhookUrl   String?
+  alertEmail        String?
+  scrubKeywords     Json?
+  isEnabled         Boolean  @default(true)
+  updatedAt         DateTime @updatedAt
+}
+
+model PushDevice {
+  id        String              @id @default(cuid())
+  userId    String
+  user      User                @relation(fields: [userId], references: [id], onDelete: Cascade)
+  token     String
+  platform  PushDevicePlatform
+  createdAt DateTime            @default(now())
+  updatedAt DateTime            @updatedAt
+
+  @@unique([userId, token])
+  @@index([userId])
+}
+
+model PushNotification {
+  id              String         @id @default(cuid())
+  title           String
+  body            String         @db.Text
+  targetType      PushTargetType
+  targetUserIds   String[]       @default([])
+  segmentFilter   Json?
+  sentCount       Int            @default(0)
+  openedCount     Int            @default(0)
+  scheduledAt     DateTime?
+  sentAt          DateTime?
+  createdByUserId String?
+  createdBy       User?          @relation("PushNotificationCreator", fields: [createdByUserId], references: [id], onDelete: SetNull)
+  createdAt       DateTime       @default(now())
+}
+
+model AiCoachLog {
+  id           String   @id @default(cuid())
+  userId       String
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  messageUser  String   @db.Text
+  messageAi    String   @db.Text
+  tokensUsed   Int?
+  sessionId    String?
+  wasHelpful   Boolean?
+  createdAt    DateTime @default(now())
+
+  @@index([userId, createdAt])
+}
+
+model AiSuggestion {
+  id               String   @id @default(cuid())
+  title            String
+  subtitle         String   @db.Text
+  icon             String?
+  targetCondition  String
+  isActive         Boolean  @default(true)
+  shownCount       Int      @default(0)
+  dismissedCount   Int      @default(0)
+  clickCount       Int      @default(0)
+  variantParentId  String?
+  variantParent    AiSuggestion? @relation("AiSuggestionVariants", fields: [variantParentId], references: [id], onDelete: SetNull)
+  variants         AiSuggestion[] @relation("AiSuggestionVariants")
+  createdByUserId  String?
+  createdBy        User?    @relation("AiSuggestionCreator", fields: [createdByUserId], references: [id], onDelete: SetNull)
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+}
+
+model AiInsightTemplate {
+  id        String      @id @default(cuid())
+  mood      InsightMood @unique
+  title     String
+  subtitle  String      @db.Text
+  icon      String?
+  updatedAt DateTime    @updatedAt
+}
+
+model Category {
+  id              String   @id @default(cuid())
+  name            String
+  emoji           String?
+  themeColor      String?
+  defaultSoundId  String?
+  defaultSound    Sound?   @relation(fields: [defaultSoundId], references: [id], onDelete: SetNull)
+  isActive        Boolean  @default(true)
+  sortOrder       Int      @default(0)
+  createdByUserId String?
+  createdBy       User?    @relation("CategoryCreatedBy", fields: [createdByUserId], references: [id], onDelete: SetNull)
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  @@index([sortOrder])
+}
+
+model Sound {
+  id               String    @id @default(cuid())
+  name             String
+  emoji            String?
+  fileUrl          String
+  durationSeconds  Int?
+  categoryTag      String?
+  isActive         Boolean   @default(true)
+  playCount        Int       @default(0)
+  deletedAt        DateTime?
+  createdByUserId  String?
+  createdBy        User?     @relation("SoundCreatedBy", fields: [createdByUserId], references: [id], onDelete: SetNull)
+  createdAt        DateTime  @default(now())
+  updatedAt        DateTime  @updatedAt
+
+  categoriesDefault Category[]
 }
 
 model Task {
@@ -109,7 +382,11 @@ model Note {
   user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
   title     String    @default("")
   body      String    @db.Text
+  /// Comma-separated inbox tags (e.g. "Work,Urgent").
+  tags      String    @default("")
   pinned    Boolean   @default(false)
+  /// Relative path under process.cwd() for uploaded voice audio (e.g. uploads/inbox-voice/...).
+  audioKey  String?
   deletedAt DateTime?
   createdAt DateTime  @default(now())
   updatedAt DateTime  @updatedAt

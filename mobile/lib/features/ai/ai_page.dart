@@ -4,62 +4,66 @@ import 'package:flutter_markdown/flutter_markdown.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
+import '../../core/models/productivity_day_model.dart';
+import '../../core/models/timeline_slot_model.dart';
 import '../../core/models/user_model.dart';
+import '../../core/runtime_remote_sync.dart' show isServerKnownUnreachable;
+import '../../features/inbox/inbox_providers.dart'
+    show connectivityProvider, inboxConnectivityLooksOffline;
 import '../../core/providers.dart';
 import '../../core/session/session_controller.dart';
 import '../../core/user_facing_errors.dart';
 import '../add_task/add_task_page.dart';
 import '../recovery/reset_day_sheet.dart';
+import '../shell/shell_tab_scope.dart';
+import '../settings/performance_coach_chart.dart';
 import '../settings/settings_providers.dart';
 import '../timeline/timeline_providers.dart';
 import '../timeline/timeline_tokens.dart';
 
 const _kCoachName = 'FocusFlow Coach';
 
-String _firstNameFromEmail(String email) {
-  final local = email.split('@').first.trim();
-  if (local.isEmpty) return 'there';
-  final word = local.split(RegExp(r'[._-]')).firstWhere((s) => s.isNotEmpty, orElse: () => local);
-  if (word.isEmpty) return 'there';
-  return '${word[0].toUpperCase()}${word.length > 1 ? word.substring(1).toLowerCase() : ''}';
-}
-
 MarkdownStyleSheet _coachMarkdownStyle(BuildContext context) {
   final base = Theme.of(context).textTheme;
+  final onSurface = Theme.of(context).colorScheme.onSurface;
+  final link = Theme.of(context).colorScheme.primary;
   return MarkdownStyleSheet(
     p: base.bodyMedium?.copyWith(
-          color: TimelineTokens.text,
+          color: onSurface,
           fontSize: 14,
           height: 1.45,
         ) ??
-        const TextStyle(color: TimelineTokens.text, fontSize: 14, height: 1.45),
+        TextStyle(color: onSurface, fontSize: 14, height: 1.45),
     h1: base.titleLarge?.copyWith(
-          color: TimelineTokens.text,
+          color: onSurface,
           fontWeight: FontWeight.w900,
           fontSize: 18,
         ) ??
-        const TextStyle(color: TimelineTokens.text, fontWeight: FontWeight.w900, fontSize: 18),
+        TextStyle(color: onSurface, fontWeight: FontWeight.w900, fontSize: 18),
     h2: base.titleMedium?.copyWith(
-          color: TimelineTokens.text,
+          color: onSurface,
           fontWeight: FontWeight.w800,
           fontSize: 16,
           height: 1.25,
         ) ??
-        const TextStyle(color: TimelineTokens.text, fontWeight: FontWeight.w800, fontSize: 16),
+        TextStyle(color: onSurface, fontWeight: FontWeight.w800, fontSize: 16),
     h3: base.titleSmall?.copyWith(
-          color: TimelineTokens.text,
+          color: onSurface,
           fontWeight: FontWeight.w800,
           fontSize: 15,
         ) ??
-        const TextStyle(color: TimelineTokens.text, fontWeight: FontWeight.w800, fontSize: 15),
-    strong: const TextStyle(
-      color: TimelineTokens.text,
+        TextStyle(color: onSurface, fontWeight: FontWeight.w800, fontSize: 15),
+    strong: TextStyle(
+      color: onSurface,
       fontWeight: FontWeight.w800,
     ),
-    listBullet: const TextStyle(color: TimelineTokens.text, fontSize: 14),
+    listBullet: TextStyle(color: onSurface, fontSize: 14),
     listIndent: 20,
     blockSpacing: 10,
-    a: const TextStyle(color: TimelineTokens.blue, decoration: TextDecoration.underline),
+    a: TextStyle(
+      color: link,
+      decoration: TextDecoration.underline,
+    ),
   );
 }
 
@@ -67,6 +71,14 @@ class _ChatTurn {
   const _ChatTurn({required this.isUser, required this.text});
   final bool isUser;
   final String text;
+}
+
+String _firstNameFromEmail(String email) {
+  final local = email.split('@').first.trim();
+  if (local.isEmpty) return 'there';
+  final word = local.split(RegExp(r'[._-]')).firstWhere((s) => s.isNotEmpty, orElse: () => local);
+  if (word.isEmpty) return 'there';
+  return '${word[0].toUpperCase()}${word.length > 1 ? word.substring(1).toLowerCase() : ''}';
 }
 
 class AiPage extends ConsumerStatefulWidget {
@@ -153,6 +165,113 @@ class _AiPageState extends ConsumerState<AiPage> {
     });
   }
 
+  Widget _coachComposerRow({bool topDivider = true, bool offline = false}) {
+    final scheme = Theme.of(context).colorScheme;
+    final bottomPad = 8 + MediaQuery.paddingOf(context).bottom;
+    return DecoratedBox(
+      decoration: BoxDecoration(
+        color: scheme.surface,
+        border: topDivider
+            ? Border(
+                top: BorderSide(
+                  color: scheme.outline.withValues(alpha: 0.35),
+                ),
+              )
+            : null,
+      ),
+      child: offline
+          ? Padding(
+              padding: EdgeInsets.fromLTRB(14, 12, 14, bottomPad + 4),
+              child: Row(
+                children: [
+                  Icon(
+                    Icons.cloud_off_rounded,
+                    size: 18,
+                    color: scheme.onSurfaceVariant.withValues(alpha: 0.7),
+                  ),
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: Text(
+                      'AI chat needs a server connection. Local insights above are still available.',
+                      style: TextStyle(
+                        color: scheme.onSurfaceVariant.withValues(alpha: 0.85),
+                        fontSize: 13,
+                        height: 1.4,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            )
+          : Padding(
+              padding: EdgeInsets.fromLTRB(10, 8, 10, bottomPad),
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.end,
+                children: [
+                  Expanded(
+                    child: TextField(
+                      controller: _controller,
+                      enabled: !_busy,
+                      style: TextStyle(color: scheme.onSurface),
+                      minLines: 1,
+                      maxLines: 4,
+                      decoration: InputDecoration(
+                        hintText: 'Ask your coach anything…',
+                  hintStyle: TextStyle(
+                    color: scheme.onSurfaceVariant.withValues(alpha: 0.8),
+                  ),
+                  filled: true,
+                  fillColor: scheme.surfaceContainerHighest,
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(14),
+                    borderSide: BorderSide(
+                      color: scheme.outline.withValues(alpha: 0.4),
+                    ),
+                  ),
+                  enabledBorder: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(14),
+                    borderSide: BorderSide(
+                      color: scheme.outline.withValues(alpha: 0.4),
+                    ),
+                  ),
+                  focusedBorder: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(14),
+                    borderSide: BorderSide(
+                      color: scheme.primary,
+                      width: 1.2,
+                    ),
+                  ),
+                  contentPadding: const EdgeInsets.symmetric(
+                    horizontal: 14,
+                    vertical: 12,
+                  ),
+                ),
+                textInputAction: TextInputAction.send,
+                onSubmitted: (_) => _send(),
+              ),
+            ),
+            const SizedBox(width: 8),
+            FilledButton(
+              onPressed: _busy ? null : _send,
+              style: FilledButton.styleFrom(
+                backgroundColor: scheme.primary,
+                foregroundColor: scheme.onPrimary,
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 16,
+                  vertical: 14,
+                ),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(14),
+                ),
+              ),
+              child: const Icon(Icons.arrow_upward, size: 20),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
   String _headerSubtitle(AsyncValue<UserModel?> session) {
     return session.maybeWhen(
       data: (user) {
@@ -167,14 +286,34 @@ class _AiPageState extends ConsumerState<AiPage> {
 
   @override
   Widget build(BuildContext context) {
-    final slotsAsync = ref.watch(timelineSlotsProvider);
-    final prodAsync = ref.watch(productivityProvider(7));
+    final scheme = Theme.of(context).colorScheme;
+    final shellTab = ShellTabIndexScope.maybeOf(context);
+    final aiActive = shellTab == null || shellTab == kShellTabAi;
+
+    // Server reachability: true offline (no net) OR WiFi but API down.
+    final netAsync = ref.watch(connectivityProvider);
+    final isOffline = netAsync.maybeWhen(
+      data: (r) => inboxConnectivityLooksOffline(r),
+      orElse: () => false,
+    );
+    final chatUnavailable = isOffline || isServerKnownUnreachable();
+
+    final slotsAsync = aiActive
+        ? ref.watch(timelineSlotsProvider)
+        : const AsyncValue<List<TimelineSlotModel>>.data(<TimelineSlotModel>[]);
+    final prodAsync = aiActive
+        ? ref.watch(productivityProvider(7))
+        : const AsyncValue<ProductivityPayload>.data(
+            ProductivityPayload(timeZone: 'local', range: 7, days: []),
+          );
+
     final session = ref.watch(sessionProvider);
 
     return Scaffold(
-      backgroundColor: TimelineTokens.bg,
+      resizeToAvoidBottomInset: true,
+      backgroundColor: TimelineTokens.scaffoldBg(context),
       appBar: AppBar(
-        backgroundColor: TimelineTokens.bg,
+        backgroundColor: TimelineTokens.scaffoldBg(context),
         surfaceTintColor: Colors.transparent,
         title: const Text('AI Coach'),
         bottom: PreferredSize(
@@ -184,7 +323,7 @@ class _AiPageState extends ConsumerState<AiPage> {
             child: Text(
               _headerSubtitle(session),
               style: TextStyle(
-                color: TimelineTokens.muted.withValues(alpha: 0.95),
+                color: scheme.onSurfaceVariant.withValues(alpha: 0.95),
                 fontSize: 12,
                 height: 1.2,
               ),
@@ -197,19 +336,22 @@ class _AiPageState extends ConsumerState<AiPage> {
         children: [
           if (_error != null)
             Material(
-              color: TimelineTokens.surface,
+              color: scheme.surface,
               child: Padding(
                 padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
                 child: Row(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Icon(Icons.info_outline, color: TimelineTokens.accent.withValues(alpha: 0.95)),
+                    Icon(
+                      Icons.info_outline,
+                      color: scheme.primary.withValues(alpha: 0.95),
+                    ),
                     const SizedBox(width: 10),
                     Expanded(
                       child: Text(
                         _error!,
                         style: TextStyle(
-                          color: TimelineTokens.muted.withValues(alpha: 0.98),
+                          color: scheme.onSurfaceVariant.withValues(alpha: 0.98),
                           fontSize: 13,
                           height: 1.35,
                         ),
@@ -218,27 +360,29 @@ class _AiPageState extends ConsumerState<AiPage> {
                     IconButton(
                       onPressed: () => setState(() => _error = null),
                       icon: const Icon(Icons.close, size: 20),
-                      color: TimelineTokens.muted,
+                      color: scheme.onSurfaceVariant,
                     ),
                   ],
                 ),
               ),
             ),
           Expanded(
-            flex: 4,
+            flex: _turns.isEmpty ? 1 : 4,
             child: SingleChildScrollView(
               padding: const EdgeInsets.fromLTRB(16, 8, 16, 16),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   slotsAsync.when(
-                    loading: () => const Padding(
-                      padding: EdgeInsets.all(24),
-                      child: Center(child: CircularProgressIndicator(color: TimelineTokens.accent)),
+                    loading: () => Padding(
+                      padding: const EdgeInsets.all(24),
+                      child: Center(
+                        child: CircularProgressIndicator(color: scheme.primary),
+                      ),
                     ),
                     error: (e, _) => Text(
                       userFacingError(e),
-                      style: const TextStyle(color: TimelineTokens.text),
+                      style: TextStyle(color: scheme.onSurface),
                     ),
                     data: (slots) {
                       final missed = slots.where((s) => s.isMissed).length;
@@ -288,7 +432,7 @@ class _AiPageState extends ConsumerState<AiPage> {
                           Text(
                             'Tap a card for a quick tip. These use your local week on device.',
                             style: TextStyle(
-                              color: TimelineTokens.muted.withValues(alpha: 0.88),
+                              color: scheme.onSurfaceVariant.withValues(alpha: 0.88),
                               fontSize: 12,
                               height: 1.35,
                             ),
@@ -301,6 +445,7 @@ class _AiPageState extends ConsumerState<AiPage> {
                                   ? 'You are finishing ${last.rate.toStringAsFixed(0)}% of planned blocks recently.'
                                   : 'Pick one must-do block and protect it with a timer — execution beats replanning.';
                               return Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
                                 children: [
                                   _SuggestionTile(
                                     icon: '🧠',
@@ -320,14 +465,30 @@ class _AiPageState extends ConsumerState<AiPage> {
                                     title: streakHint,
                                     subtitle: 'Based on your last 7 days in the local planner.',
                                   ),
+                                  const SizedBox(height: 18),
+                                  _SectionLabel(text: 'Performance (7 days)'),
+                                  const SizedBox(height: 8),
+                                  PerformanceCoachChart(days: prod.days),
                                 ],
                               );
                             },
-                            loading: () => const Padding(
-                              padding: EdgeInsets.symmetric(vertical: 16),
-                              child: Center(child: CircularProgressIndicator(color: TimelineTokens.accent)),
+                            loading: () => Padding(
+                              padding: const EdgeInsets.symmetric(vertical: 16),
+                              child: Center(
+                                child: CircularProgressIndicator(color: scheme.primary),
+                              ),
                             ),
-                            error: (_, _) => const SizedBox.shrink(),
+                            error: (e, _) => Padding(
+                              padding: const EdgeInsets.only(top: 8),
+                              child: Text(
+                                userFacingError(e),
+                                style: TextStyle(
+                                  color: scheme.onSurfaceVariant,
+                                  fontSize: 13,
+                                  height: 1.35,
+                                ),
+                              ),
+                            ),
                           ),
                           const SizedBox(height: 20),
                           _SectionLabel(text: 'One-tap actions'),
@@ -375,22 +536,168 @@ class _AiPageState extends ConsumerState<AiPage> {
               ),
             ),
           ),
-          Padding(
-            padding: const EdgeInsets.fromLTRB(12, 0, 12, 8),
-            child: _SectionLabel(text: 'Chat with your coach'),
-          ),
-          Expanded(
-            flex: 5,
-            child: Padding(
-              padding: const EdgeInsets.fromLTRB(12, 0, 12, 0),
+          if (_turns.isNotEmpty) ...[
+            Padding(
+              padding: const EdgeInsets.fromLTRB(12, 0, 12, 8),
+              child: _SectionLabel(text: 'Chat with your coach'),
+            ),
+            Expanded(
+              flex: 5,
+              child: Padding(
+                padding: const EdgeInsets.fromLTRB(12, 0, 12, 8),
+                child: DecoratedBox(
+                  decoration: BoxDecoration(
+                    color: scheme.surface,
+                    borderRadius: BorderRadius.circular(18),
+                    border: Border.all(
+                      color: scheme.outline.withValues(alpha: 0.35),
+                    ),
+                    boxShadow: [
+                      BoxShadow(
+                        color: scheme.shadow.withValues(alpha: 0.18),
+                        blurRadius: 18,
+                        offset: const Offset(0, 8),
+                      ),
+                    ],
+                  ),
+                  child: ClipRRect(
+                    borderRadius: BorderRadius.circular(18),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
+                      children: [
+                        Container(
+                          width: double.infinity,
+                          padding: const EdgeInsets.fromLTRB(14, 10, 14, 8),
+                          decoration: BoxDecoration(
+                            border: Border(
+                              bottom: BorderSide(
+                                color: scheme.outline.withValues(alpha: 0.35),
+                              ),
+                            ),
+                          ),
+                          child: Text(
+                            'Messages stay on this device until sent. When you are online, $_kCoachName can reply in more detail.',
+                            style: TextStyle(
+                              color: scheme.onSurfaceVariant.withValues(alpha: 0.92),
+                              fontSize: 12,
+                              height: 1.35,
+                            ),
+                          ),
+                        ),
+                        Expanded(
+                          child: ListView.builder(
+                            controller: _scrollChat,
+                            padding: const EdgeInsets.fromLTRB(12, 12, 12, 8),
+                            itemCount: _turns.length,
+                            itemBuilder: (context, i) {
+                              final cs = Theme.of(context).colorScheme;
+                              final t = _turns[i];
+                              if (t.isUser) {
+                                return Align(
+                                  alignment: Alignment.centerRight,
+                                  child: Container(
+                                    margin: const EdgeInsets.only(bottom: 12),
+                                    padding: const EdgeInsets.symmetric(
+                                      horizontal: 14,
+                                      vertical: 10,
+                                    ),
+                                    constraints: BoxConstraints(
+                                      maxWidth: MediaQuery.sizeOf(context).width * 0.82,
+                                    ),
+                                    decoration: BoxDecoration(
+                                      color: cs.primary.withValues(alpha: 0.92),
+                                      borderRadius: const BorderRadius.only(
+                                        topLeft: Radius.circular(16),
+                                        topRight: Radius.circular(16),
+                                        bottomLeft: Radius.circular(16),
+                                        bottomRight: Radius.circular(4),
+                                      ),
+                                      border: Border.all(
+                                        color: cs.outline.withValues(alpha: 0.25),
+                                      ),
+                                    ),
+                                    child: Text(
+                                      t.text,
+                                      style: TextStyle(
+                                        color: cs.onPrimary,
+                                        fontSize: 14,
+                                        height: 1.4,
+                                      ),
+                                    ),
+                                  ),
+                                );
+                              }
+                              return Align(
+                                alignment: Alignment.centerLeft,
+                                child: Padding(
+                                  padding: const EdgeInsets.only(bottom: 14),
+                                  child: Column(
+                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                    children: [
+                                      Text(
+                                        _kCoachName,
+                                        style: TextStyle(
+                                          fontFamily: 'monospace',
+                                          fontSize: 10,
+                                          fontWeight: FontWeight.w700,
+                                          letterSpacing: 0.6,
+                                          color: cs.onSurfaceVariant.withValues(alpha: 0.95),
+                                        ),
+                                      ),
+                                      const SizedBox(height: 6),
+                                      Container(
+                                        constraints: BoxConstraints(
+                                          maxWidth: MediaQuery.sizeOf(context).width * 0.88,
+                                        ),
+                                        padding: const EdgeInsets.fromLTRB(12, 10, 12, 12),
+                                        decoration: BoxDecoration(
+                                          color: cs.surfaceContainerHighest,
+                                          borderRadius: const BorderRadius.only(
+                                            topLeft: Radius.circular(4),
+                                            topRight: Radius.circular(16),
+                                            bottomLeft: Radius.circular(16),
+                                            bottomRight: Radius.circular(16),
+                                          ),
+                                          border: Border.all(
+                                            color: cs.outline.withValues(alpha: 0.35),
+                                          ),
+                                        ),
+                                        child: MarkdownBody(
+                                          data: t.text,
+                                          shrinkWrap: true,
+                                          selectable: true,
+                                          styleSheet: _coachMarkdownStyle(context),
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                              );
+                            },
+                          ),
+                        ),
+                        if (_busy)
+                          LinearProgressIndicator(minHeight: 2, color: scheme.primary),
+                        _coachComposerRow(offline: chatUnavailable),
+                      ],
+                    ),
+                  ),
+                ),
+              ),
+            ),
+          ] else
+            Padding(
+              padding: const EdgeInsets.fromLTRB(12, 0, 12, 8),
               child: DecoratedBox(
                 decoration: BoxDecoration(
-                  color: TimelineTokens.surface,
+                  color: scheme.surface,
                   borderRadius: BorderRadius.circular(18),
-                  border: Border.all(color: TimelineTokens.border2),
+                  border: Border.all(
+                    color: scheme.outline.withValues(alpha: 0.35),
+                  ),
                   boxShadow: [
                     BoxShadow(
-                      color: Colors.black.withValues(alpha: 0.35),
+                      color: scheme.shadow.withValues(alpha: 0.18),
                       blurRadius: 18,
                       offset: const Offset(0, 8),
                     ),
@@ -398,183 +705,10 @@ class _AiPageState extends ConsumerState<AiPage> {
                 ),
                 child: ClipRRect(
                   borderRadius: BorderRadius.circular(18),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.stretch,
-                    children: [
-                      Container(
-                        width: double.infinity,
-                        padding: const EdgeInsets.fromLTRB(14, 10, 14, 8),
-                        decoration: BoxDecoration(
-                          border: Border(
-                            bottom: BorderSide(color: TimelineTokens.border.withValues(alpha: 0.85)),
-                          ),
-                        ),
-                        child: Text(
-                          'Messages stay on this device until sent. When you are online, $_kCoachName can reply in more detail.',
-                          style: TextStyle(
-                            color: TimelineTokens.muted.withValues(alpha: 0.92),
-                            fontSize: 12,
-                            height: 1.35,
-                          ),
-                        ),
-                      ),
-                      Expanded(
-                        child: ListView.builder(
-                          controller: _scrollChat,
-                          padding: const EdgeInsets.fromLTRB(12, 12, 12, 12),
-                          itemCount: _turns.isEmpty ? 1 : _turns.length,
-                          itemBuilder: (context, i) {
-                            if (_turns.isEmpty) {
-                              return Padding(
-                                padding: const EdgeInsets.only(top: 8, bottom: 16),
-                                child: Text(
-                                  'Ask anything about your day, energy, or habits. When you are connected, '
-                                  'your coach reads your saved context and replies here.',
-                                  style: TextStyle(
-                                    color: TimelineTokens.muted.withValues(alpha: 0.95),
-                                    fontSize: 13,
-                                    height: 1.45,
-                                  ),
-                                ),
-                              );
-                            }
-                            final t = _turns[i];
-                            if (t.isUser) {
-                              return Align(
-                                alignment: Alignment.centerRight,
-                                child: Container(
-                                  margin: const EdgeInsets.only(bottom: 12),
-                                  padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-                                  constraints: BoxConstraints(
-                                    maxWidth: MediaQuery.sizeOf(context).width * 0.82,
-                                  ),
-                                  decoration: BoxDecoration(
-                                    color: TimelineTokens.accent.withValues(alpha: 0.9),
-                                    borderRadius: const BorderRadius.only(
-                                      topLeft: Radius.circular(16),
-                                      topRight: Radius.circular(16),
-                                      bottomLeft: Radius.circular(16),
-                                      bottomRight: Radius.circular(4),
-                                    ),
-                                    border: Border.all(color: TimelineTokens.border.withValues(alpha: 0.35)),
-                                  ),
-                                  child: Text(
-                                    t.text,
-                                    style: const TextStyle(
-                                      color: Colors.black,
-                                      fontSize: 14,
-                                      height: 1.4,
-                                    ),
-                                  ),
-                                ),
-                              );
-                            }
-                            return Align(
-                              alignment: Alignment.centerLeft,
-                              child: Padding(
-                                padding: const EdgeInsets.only(bottom: 14),
-                                child: Column(
-                                  crossAxisAlignment: CrossAxisAlignment.start,
-                                  children: [
-                                    Text(
-                                      _kCoachName,
-                                      style: TextStyle(
-                                        fontFamily: 'monospace',
-                                        fontSize: 10,
-                                        fontWeight: FontWeight.w700,
-                                        letterSpacing: 0.6,
-                                        color: TimelineTokens.muted.withValues(alpha: 0.95),
-                                      ),
-                                    ),
-                                    const SizedBox(height: 6),
-                                    Container(
-                                      constraints: BoxConstraints(
-                                        maxWidth: MediaQuery.sizeOf(context).width * 0.88,
-                                      ),
-                                      padding: const EdgeInsets.fromLTRB(12, 10, 12, 12),
-                                      decoration: BoxDecoration(
-                                        color: TimelineTokens.card,
-                                        borderRadius: const BorderRadius.only(
-                                          topLeft: Radius.circular(4),
-                                          topRight: Radius.circular(16),
-                                          bottomLeft: Radius.circular(16),
-                                          bottomRight: Radius.circular(16),
-                                        ),
-                                        border: Border.all(
-                                          color: TimelineTokens.border.withValues(alpha: 0.65),
-                                        ),
-                                      ),
-                                      child: MarkdownBody(
-                                        data: t.text,
-                                        shrinkWrap: true,
-                                        selectable: true,
-                                        styleSheet: _coachMarkdownStyle(context),
-                                      ),
-                                    ),
-                                  ],
-                                ),
-                              ),
-                            );
-                          },
-                        ),
-                      ),
-                    ],
-                  ),
+                  child: _coachComposerRow(topDivider: false, offline: chatUnavailable),
                 ),
               ),
             ),
-          ),
-          if (_busy)
-            const LinearProgressIndicator(minHeight: 2, color: TimelineTokens.accent),
-          Padding(
-            padding: EdgeInsets.fromLTRB(12, 8, 12, 8 + MediaQuery.paddingOf(context).bottom),
-            child: Row(
-              crossAxisAlignment: CrossAxisAlignment.end,
-              children: [
-                Expanded(
-                  child: TextField(
-                    controller: _controller,
-                    enabled: !_busy,
-                    style: const TextStyle(color: TimelineTokens.text),
-                    minLines: 1,
-                    maxLines: 4,
-                    decoration: InputDecoration(
-                      hintText: 'Ask your coach anything…',
-                      hintStyle: TextStyle(color: TimelineTokens.muted.withValues(alpha: 0.8)),
-                      filled: true,
-                      fillColor: TimelineTokens.card,
-                      border: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(14),
-                        borderSide: const BorderSide(color: TimelineTokens.border),
-                      ),
-                      enabledBorder: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(14),
-                        borderSide: const BorderSide(color: TimelineTokens.border),
-                      ),
-                      focusedBorder: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(14),
-                        borderSide: const BorderSide(color: TimelineTokens.accent, width: 1.2),
-                      ),
-                      contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-                    ),
-                    textInputAction: TextInputAction.send,
-                    onSubmitted: (_) => _send(),
-                  ),
-                ),
-                const SizedBox(width: 8),
-                FilledButton(
-                  onPressed: _busy ? null : _send,
-                  style: FilledButton.styleFrom(
-                    backgroundColor: TimelineTokens.accent,
-                    foregroundColor: Colors.black,
-                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
-                  ),
-                  child: const Icon(Icons.arrow_upward, size: 20),
-                ),
-              ],
-            ),
-          ),
         ],
       ),
     );
@@ -587,6 +721,7 @@ class _SectionLabel extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
     return Text(
       text.toUpperCase(),
       style: TextStyle(
@@ -594,7 +729,7 @@ class _SectionLabel extends StatelessWidget {
         fontSize: 10,
         fontWeight: FontWeight.w700,
         letterSpacing: 1.1,
-        color: TimelineTokens.muted.withValues(alpha: 0.9),
+        color: cs.onSurfaceVariant.withValues(alpha: 0.9),
       ),
     );
   }
@@ -615,8 +750,13 @@ class _InsightCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final border = warn ? TimelineTokens.accent.withValues(alpha: 0.45) : TimelineTokens.border;
-    final bg = warn ? TimelineTokens.accent.withValues(alpha: 0.08) : TimelineTokens.card;
+    final cs = Theme.of(context).colorScheme;
+    final border = warn
+        ? cs.primary.withValues(alpha: 0.45)
+        : cs.outline.withValues(alpha: 0.35);
+    final bg = warn
+        ? Color.alphaBlend(cs.primary.withValues(alpha: 0.1), cs.surface)
+        : cs.surfaceContainerHighest;
     return Material(
       color: bg,
       borderRadius: BorderRadius.circular(16),
@@ -641,8 +781,8 @@ class _InsightCard extends StatelessWidget {
                     children: [
                       Text(
                         title,
-                        style: const TextStyle(
-                          color: TimelineTokens.text,
+                        style: TextStyle(
+                          color: cs.onSurface,
                           fontWeight: FontWeight.w800,
                           fontSize: 15,
                         ),
@@ -651,7 +791,7 @@ class _InsightCard extends StatelessWidget {
                       Text(
                         body,
                         style: TextStyle(
-                          color: TimelineTokens.muted.withValues(alpha: 0.95),
+                          color: cs.onSurfaceVariant.withValues(alpha: 0.95),
                           fontSize: 13,
                           height: 1.4,
                         ),
@@ -667,8 +807,8 @@ class _InsightCard extends StatelessWidget {
               icon: const Icon(Icons.bolt_rounded, size: 20),
               label: const Text('Fix my day'),
               style: FilledButton.styleFrom(
-                backgroundColor: TimelineTokens.accent,
-                foregroundColor: Colors.black,
+                backgroundColor: cs.primary,
+                foregroundColor: cs.onPrimary,
               ),
             ),
           ],
@@ -691,12 +831,13 @@ class _SuggestionTile extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
     return Padding(
       padding: const EdgeInsets.only(bottom: 10),
       child: Material(
-        color: TimelineTokens.card,
+        color: cs.surfaceContainerHighest,
         elevation: 2,
-        shadowColor: Colors.black54,
+        shadowColor: cs.shadow.withValues(alpha: 0.35),
         borderRadius: BorderRadius.circular(16),
         child: InkWell(
           borderRadius: BorderRadius.circular(16),
@@ -708,7 +849,7 @@ class _SuggestionTile extends StatelessWidget {
           child: Container(
             decoration: BoxDecoration(
               borderRadius: BorderRadius.circular(16),
-              border: Border.all(color: TimelineTokens.border2.withValues(alpha: 0.9)),
+              border: Border.all(color: cs.outline.withValues(alpha: 0.35)),
             ),
             padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
             child: Row(
@@ -722,8 +863,8 @@ class _SuggestionTile extends StatelessWidget {
                     children: [
                       Text(
                         title,
-                        style: const TextStyle(
-                          color: TimelineTokens.text,
+                        style: TextStyle(
+                          color: cs.onSurface,
                           fontWeight: FontWeight.w800,
                           fontSize: 15,
                           height: 1.2,
@@ -733,7 +874,7 @@ class _SuggestionTile extends StatelessWidget {
                       Text(
                         subtitle,
                         style: TextStyle(
-                          color: TimelineTokens.muted.withValues(alpha: 0.94),
+                          color: cs.onSurfaceVariant.withValues(alpha: 0.94),
                           fontSize: 13,
                           height: 1.4,
                         ),
@@ -743,7 +884,10 @@ class _SuggestionTile extends StatelessWidget {
                 ),
                 Padding(
                   padding: const EdgeInsets.only(top: 2),
-                  child: Icon(Icons.chevron_right, color: TimelineTokens.muted.withValues(alpha: 0.85)),
+                  child: Icon(
+                    Icons.chevron_right,
+                    color: cs.onSurfaceVariant.withValues(alpha: 0.85),
+                  ),
                 ),
               ],
             ),
@@ -767,8 +911,9 @@ class _AiActionChip extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
     return Material(
-      color: TimelineTokens.card,
+      color: cs.surfaceContainerHighest,
       borderRadius: BorderRadius.circular(14),
       child: InkWell(
         borderRadius: BorderRadius.circular(14),
@@ -785,8 +930,8 @@ class _AiActionChip extends StatelessWidget {
                   label,
                   maxLines: 2,
                   overflow: TextOverflow.ellipsis,
-                  style: const TextStyle(
-                    color: TimelineTokens.text,
+                  style: TextStyle(
+                    color: cs.onSurface,
                     fontWeight: FontWeight.w700,
                     fontSize: 12,
                     height: 1.25,

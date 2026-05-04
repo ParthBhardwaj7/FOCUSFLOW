@@ -43,9 +43,7 @@ export class AiService {
       where: { id: userId },
       select: { email: true, profileSummary: true },
     });
-    const firstName = user?.email
-      ? firstNameFromEmail(user.email)
-      : 'friend';
+    const firstName = user?.email ? firstNameFromEmail(user.email) : 'friend';
     const memories = await this.prisma.userMemory.findMany({
       where: { userId },
       orderBy: { createdAt: 'desc' },
@@ -67,16 +65,13 @@ export class AiService {
 
     const systemParts = [
       [
-        'You are FocusFlow Coach: warm, encouraging, and practical. The user’s first name is ' +
+        'You are FocusFlow Coach: direct, practical, and never preachy. The user’s first name is ' +
           firstName +
-          '. Speak to them naturally (you may open with "Hi ' +
-          firstName +
-          '," when it fits).',
-        'Always format your reply in Markdown suitable for a mobile app:',
-        '- Start with a short greeting line when helpful.',
-        '- Use ## headings (you may add one relevant emoji after the heading text) for each main section.',
-        '- Use **bold** for short emphasis, and bullet lists with "-" for steps.',
-        '- Keep paragraphs short; end with one gentle forward-looking line when appropriate.',
+          '. Prefer "you" over stiff formality.',
+        'Default reply length: at most 3–4 short sentences unless the user clearly asks for depth, lists, or a plan.',
+        'Always ground advice in the user’s data when it is present in this prompt (planner stats, memories, profile). Do not give generic productivity platitudes when specific numbers or titles are available.',
+        'Tone: encouraging but concise; one forward-looking line at the end is enough.',
+        'Markdown: use light Markdown when it helps (short **bold**, occasional bullets). Do not require ## section headings for short answers.',
         'Do not mention API keys, model vendors, or server configuration.',
       ].join('\n'),
       user?.profileSummary
@@ -95,6 +90,19 @@ export class AiService {
     const messages = [{ role: 'system' as const, content: system }, ...thread];
 
     const message = await this.llm.chat(messages);
+    const lastUser = [...thread].reverse().find((m) => m.role === 'user');
+    if (lastUser) {
+      await this.prisma.aiCoachLog
+        .create({
+          data: {
+            userId,
+            messageUser: lastUser.content.slice(0, 32_000),
+            messageAi: message.slice(0, 32_000),
+            tokensUsed: null,
+          },
+        })
+        .catch(() => undefined);
+    }
     return { message };
   }
 }

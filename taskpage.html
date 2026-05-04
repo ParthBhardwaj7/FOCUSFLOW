@@ -1,0 +1,984 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, viewport-fit=cover">
+<title>Add Task — Reference</title>
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@300;400;500;600;700&family=Outfit:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+<style>
+* { margin:0; padding:0; box-sizing:border-box; -webkit-tap-highlight-color:transparent; }
+
+:root {
+  --bg: #080810;
+  --surface: #0f0f1a;
+  --card: #13131f;
+  --card2: #181828;
+  --border: #1e1e32;
+  --border2: #2a2a44;
+  --text: #e8e8f8;
+  --sub: #6060a0;
+  --muted: #282840;
+  --green: #00ffaa;
+  --green-dim: rgba(0,255,170,0.12);
+  --green-soft: rgba(0,255,170,0.07);
+  --yellow: #ffcc44;
+  --red: #ff4466;
+  --coral: #ff5e5e;
+  --orange: #ff8844;
+  --mono: 'JetBrains Mono', ui-monospace, monospace;
+  --sans: 'Outfit', system-ui, sans-serif;
+  --radius: 16px;
+  --radius-sm: 10px;
+  --transition: 0.2s cubic-bezier(0.34,1.2,0.64,1);
+}
+
+html { background: var(--bg); }
+
+body {
+  background: var(--bg);
+  color: var(--text);
+  font-family: var(--sans);
+  min-height: 100vh;
+  display: flex;
+  justify-content: center;
+  align-items: flex-start;
+  padding: 24px 16px 80px;
+}
+
+body::before {
+  content: '';
+  position: fixed;
+  inset: 0;
+  background-image:
+    linear-gradient(rgba(0,255,170,0.015) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(0,255,170,0.015) 1px, transparent 1px);
+  background-size: 40px 40px;
+  pointer-events: none;
+  z-index: 0;
+}
+
+.phone-frame {
+  width: 100%;
+  max-width: 390px;
+  position: relative;
+  z-index: 1;
+  display: flex;
+  flex-direction: column;
+  gap: clamp(12px, 3vw, 18px);
+}
+
+/* ── HEADER ── */
+.header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 4px 0 8px;
+}
+.back-btn {
+  width: 36px; height: 36px;
+  display: flex; align-items: center; justify-content: center;
+  border-radius: 50%;
+  border: 1.5px solid var(--border2);
+  background: var(--card);
+  cursor: pointer;
+  transition: var(--transition);
+  color: var(--text);
+  font-size: 16px;
+}
+.back-btn:active { transform: scale(0.9); background: var(--card2); }
+.header-title {
+  font-family: var(--sans);
+  font-size: clamp(16px, 4.5vw, 18px);
+  font-weight: 700;
+  letter-spacing: -0.3px;
+}
+.header-date {
+  font-family: var(--mono);
+  font-size: clamp(9px, 2.5vw, 11px);
+  color: var(--sub);
+  letter-spacing: 0.3px;
+}
+
+/* ── FORM CONTAINER ── */
+.form-wrap {
+  display: flex;
+  flex-direction: column;
+  gap: clamp(10px, 2.5vw, 14px);
+  border: 1.5px solid var(--border);
+  border-radius: 20px;
+  padding: clamp(14px, 3.5vw, 20px);
+  background: var(--card);
+  transition: border-color 0.3s ease, box-shadow 0.3s ease;
+}
+.form-wrap.mit-active {
+  border-color: rgba(255,136,68,0.45);
+  box-shadow: 0 0 0 1px rgba(255,136,68,0.1), 0 12px 40px rgba(255,136,68,0.08);
+}
+
+/* ── MIT TOGGLE ── */
+.mit-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: clamp(10px, 2.5vw, 13px) clamp(12px, 3vw, 16px);
+  border-radius: var(--radius-sm);
+  border: 1.5px solid var(--border2);
+  background: var(--card2);
+  cursor: pointer;
+  min-height: 44px;
+  transition: var(--transition);
+}
+.mit-row:active { transform: scale(0.98); }
+.mit-row.on {
+  border-color: rgba(255,136,68,0.4);
+  background: rgba(255,136,68,0.06);
+}
+.mit-label {
+  display: flex; align-items: center; gap: 8px;
+  font-size: clamp(12px, 3.2vw, 13px);
+  font-weight: 600;
+  color: var(--sub);
+  transition: color 0.2s;
+}
+.mit-row.on .mit-label { color: var(--orange); }
+.mit-icon { font-size: clamp(14px, 3.5vw, 16px); }
+.toggle-pill {
+  width: 42px; height: 24px;
+  border-radius: 12px;
+  background: var(--muted);
+  position: relative;
+  transition: background 0.25s ease;
+  flex-shrink: 0;
+}
+.toggle-pill.on { background: var(--orange); }
+.toggle-knob {
+  position: absolute;
+  top: 3px; left: 3px;
+  width: 18px; height: 18px;
+  border-radius: 50%;
+  background: white;
+  transition: transform 0.25s cubic-bezier(0.34,1.56,0.64,1);
+  box-shadow: 0 1px 4px rgba(0,0,0,0.4);
+}
+.toggle-pill.on .toggle-knob { transform: translateX(18px); }
+
+/* ── TASK NAME ── */
+.input-wrap {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: clamp(10px, 2.5vw, 13px) clamp(12px, 3vw, 14px);
+  border-radius: var(--radius-sm);
+  border: 1.5px solid var(--border2);
+  background: var(--card2);
+  transition: border-color 0.2s;
+  min-height: 52px;
+}
+.input-wrap:focus-within {
+  border-color: rgba(0,255,170,0.35);
+  box-shadow: 0 0 0 1px rgba(0,255,170,0.08);
+}
+.input-emoji {
+  width: 34px; height: 34px;
+  border-radius: 50%;
+  background: rgba(0,255,170,0.1);
+  border: 1.5px solid rgba(0,255,170,0.2);
+  display: flex; align-items: center; justify-content: center;
+  font-size: 16px;
+  flex-shrink: 0;
+}
+.task-input {
+  flex: 1;
+  background: transparent;
+  border: none;
+  outline: none;
+  color: var(--text);
+  font-family: var(--sans);
+  font-size: clamp(14px, 3.8vw, 16px);
+  font-weight: 500;
+}
+.task-input::placeholder { color: var(--sub); }
+.char-count {
+  font-family: var(--mono);
+  font-size: 10px;
+  color: var(--sub);
+  opacity: 0;
+  transition: opacity 0.2s;
+  flex-shrink: 0;
+}
+.char-count.visible { opacity: 1; }
+.char-count.warn { color: var(--yellow); }
+
+/* ── SECTION LABEL ── */
+.section-label {
+  font-family: var(--mono);
+  font-size: clamp(8px, 2.2vw, 9px);
+  letter-spacing: 2px;
+  text-transform: uppercase;
+  color: var(--sub);
+  padding: 0 2px;
+}
+
+/* ── CATEGORY CHIPS ── */
+.category-scroll {
+  overflow-x: auto;
+  scrollbar-width: none;
+  -webkit-overflow-scrolling: touch;
+  padding-bottom: 4px;
+  mask-image: linear-gradient(to right, transparent 0%, black 8%, black 88%, transparent 100%);
+  -webkit-mask-image: linear-gradient(to right, transparent 0%, black 8%, black 88%, transparent 100%);
+}
+.category-scroll::-webkit-scrollbar { display: none; }
+.category-row {
+  display: flex;
+  gap: 7px;
+  width: max-content;
+  padding: 2px 4px;
+}
+.cat-chip {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: clamp(7px, 2vw, 9px) clamp(10px, 2.8vw, 13px);
+  border-radius: 20px;
+  border: 1.5px solid var(--border2);
+  background: var(--card2);
+  cursor: pointer;
+  white-space: nowrap;
+  transition: var(--transition);
+  min-height: 36px;
+  font-size: clamp(11px, 3vw, 12px);
+  font-weight: 500;
+  color: var(--sub);
+}
+.cat-chip:active { transform: scale(0.94); }
+.cat-chip.selected {
+  background: var(--green);
+  border-color: var(--green);
+  color: #080810;
+  font-weight: 700;
+  box-shadow: 0 4px 16px rgba(0,255,170,0.25);
+}
+.cat-emoji { font-size: clamp(13px, 3.2vw, 14px); }
+
+/* ── SOUND ROW ── */
+.sound-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: clamp(9px, 2.3vw, 11px) clamp(12px, 3vw, 14px);
+  border-radius: var(--radius-sm);
+  border: 1.5px solid var(--border2);
+  background: var(--card2);
+  cursor: pointer;
+  min-height: 44px;
+  overflow: hidden;
+  max-height: 0;
+  opacity: 0;
+  padding-top: 0;
+  padding-bottom: 0;
+  border-width: 0;
+  transition: max-height 0.28s ease, opacity 0.22s ease, padding 0.22s ease, border-width 0.22s ease;
+}
+.sound-row.visible {
+  max-height: 60px;
+  opacity: 1;
+  padding-top: clamp(9px, 2.3vw, 11px);
+  padding-bottom: clamp(9px, 2.3vw, 11px);
+  border-width: 1.5px;
+}
+.sound-row:active { background: var(--muted); }
+.sound-left {
+  display: flex; align-items: center; gap: 8px;
+  font-size: clamp(12px, 3.2vw, 13px);
+  color: var(--sub);
+}
+.sound-icon { font-size: 14px; }
+.sound-name {
+  font-weight: 500;
+  color: var(--text);
+  font-size: clamp(12px, 3.2vw, 13px);
+}
+.sound-change {
+  font-family: var(--mono);
+  font-size: 9px;
+  letter-spacing: 1px;
+  text-transform: uppercase;
+  color: var(--green);
+  opacity: 0.7;
+}
+
+/* ── TIME BLOCK ── */
+.time-block {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.time-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.time-pill {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: clamp(10px, 2.5vw, 12px);
+  border-radius: var(--radius-sm);
+  border: 1.5px solid var(--border2);
+  background: var(--card2);
+  cursor: pointer;
+  min-height: 56px;
+  transition: var(--transition);
+  gap: 3px;
+}
+.time-pill:active { transform: scale(0.97); border-color: rgba(0,255,170,0.3); }
+.time-label {
+  font-family: var(--mono);
+  font-size: 9px;
+  letter-spacing: 1.5px;
+  text-transform: uppercase;
+  color: var(--sub);
+}
+.time-value {
+  font-family: var(--mono);
+  font-size: clamp(18px, 5vw, 22px);
+  font-weight: 600;
+  letter-spacing: -0.5px;
+  color: var(--text);
+}
+.time-arrow {
+  font-size: 14px;
+  color: var(--sub);
+  flex-shrink: 0;
+}
+.duration-badge {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 5px;
+  padding: 5px 10px;
+  border-radius: 20px;
+  background: rgba(0,255,170,0.08);
+  border: 1px solid rgba(0,255,170,0.15);
+}
+.duration-text {
+  font-family: var(--mono);
+  font-size: clamp(10px, 2.5vw, 11px);
+  color: var(--green);
+  font-weight: 500;
+}
+.duration-dot {
+  width: 4px; height: 4px;
+  border-radius: 50%;
+  background: var(--green);
+  opacity: 0.5;
+}
+.next-day-warn {
+  font-family: var(--mono);
+  font-size: 10px;
+  color: var(--yellow);
+  letter-spacing: 0.3px;
+  opacity: 0;
+  max-height: 0;
+  overflow: hidden;
+  transition: opacity 0.2s, max-height 0.2s;
+}
+.next-day-warn.show { opacity: 1; max-height: 20px; }
+
+.duration-pills {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 7px;
+}
+.dur-pill {
+  padding: clamp(7px, 2vw, 8px) clamp(12px, 3.2vw, 14px);
+  border-radius: 20px;
+  border: 1.5px solid var(--border2);
+  background: var(--card2);
+  font-family: var(--mono);
+  font-size: clamp(10px, 2.8vw, 12px);
+  font-weight: 500;
+  color: var(--sub);
+  cursor: pointer;
+  transition: var(--transition);
+  min-height: 36px;
+  display: flex; align-items: center;
+}
+.dur-pill:active { transform: scale(0.93); }
+.dur-pill.active {
+  background: var(--green);
+  border-color: var(--green);
+  color: #080810;
+  font-weight: 700;
+  box-shadow: 0 4px 14px rgba(0,255,170,0.2);
+}
+
+/* ── REPEAT ── */
+.repeat-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: clamp(10px, 2.5vw, 12px) clamp(12px, 3vw, 14px);
+  border-radius: var(--radius-sm);
+  border: 1.5px solid var(--border2);
+  background: var(--card2);
+  cursor: pointer;
+  min-height: 44px;
+}
+.repeat-label {
+  display: flex; align-items: center; gap: 8px;
+  font-size: clamp(12px, 3.2vw, 13px);
+  font-weight: 500;
+  color: var(--text);
+}
+.repeat-expand {
+  max-height: 0;
+  overflow: hidden;
+  opacity: 0;
+  transition: max-height 0.28s ease, opacity 0.22s ease, padding 0.22s ease;
+  padding: 0 clamp(12px, 3vw, 14px);
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.repeat-expand.open {
+  max-height: 140px;
+  opacity: 1;
+  padding-top: 10px;
+  padding-bottom: 4px;
+}
+.repeat-freq-row {
+  display: flex;
+  gap: 7px;
+  flex-wrap: wrap;
+}
+.freq-chip {
+  padding: 7px 13px;
+  border-radius: 20px;
+  border: 1.5px solid var(--border2);
+  background: transparent;
+  font-size: clamp(11px, 3vw, 12px);
+  font-weight: 500;
+  color: var(--sub);
+  cursor: pointer;
+  transition: var(--transition);
+  min-height: 34px;
+  display: flex; align-items: center;
+}
+.freq-chip:active { transform: scale(0.93); }
+.freq-chip.active {
+  border-color: rgba(0,255,170,0.4);
+  background: rgba(0,255,170,0.08);
+  color: var(--green);
+}
+.days-row {
+  display: flex;
+  gap: 5px;
+  max-height: 0;
+  overflow: hidden;
+  opacity: 0;
+  transition: max-height 0.22s ease, opacity 0.18s ease;
+}
+.days-row.open { max-height: 40px; opacity: 1; }
+.day-dot {
+  flex: 1;
+  min-width: 0;
+  aspect-ratio: 1;
+  border-radius: 50%;
+  border: 1.5px solid var(--border2);
+  background: var(--card2);
+  display: flex; align-items: center; justify-content: center;
+  font-family: var(--mono);
+  font-size: clamp(9px, 2.5vw, 10px);
+  font-weight: 600;
+  color: var(--sub);
+  cursor: pointer;
+  transition: var(--transition);
+  min-height: 36px;
+}
+.day-dot:active { transform: scale(0.88); }
+.day-dot.on {
+  background: var(--green);
+  border-color: var(--green);
+  color: #080810;
+}
+
+/* ── NOTES ── */
+.notes-toggle {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: clamp(9px, 2.3vw, 11px) clamp(12px, 3vw, 14px);
+  border-radius: var(--radius-sm);
+  border: 1.5px dashed var(--border2);
+  background: transparent;
+  cursor: pointer;
+  min-height: 44px;
+  transition: var(--transition);
+  color: var(--sub);
+  font-size: clamp(12px, 3.2vw, 13px);
+  font-weight: 500;
+}
+.notes-toggle:active { transform: scale(0.98); background: var(--card2); }
+.notes-toggle.open {
+  border-style: solid;
+  border-color: var(--border2);
+  background: var(--card2);
+  color: var(--text);
+  border-radius: var(--radius-sm) var(--radius-sm) 0 0;
+  border-bottom: none;
+}
+.notes-area-wrap {
+  max-height: 0;
+  overflow: hidden;
+  opacity: 0;
+  transition: max-height 0.28s ease, opacity 0.22s ease;
+}
+.notes-area-wrap.open {
+  max-height: 120px;
+  opacity: 1;
+}
+.notes-area {
+  width: 100%;
+  min-height: 80px;
+  background: var(--card2);
+  border: 1.5px solid var(--border2);
+  border-top: none;
+  border-radius: 0 0 var(--radius-sm) var(--radius-sm);
+  outline: none;
+  color: var(--text);
+  font-family: var(--sans);
+  font-size: clamp(13px, 3.5vw, 14px);
+  padding: 10px 14px;
+  resize: none;
+}
+
+/* ── CREATE BUTTON ── */
+.create-btn {
+  width: 100%;
+  padding: clamp(14px, 3.8vw, 17px);
+  border-radius: var(--radius);
+  border: none;
+  background: var(--coral);
+  color: white;
+  font-family: var(--sans);
+  font-size: clamp(14px, 3.8vw, 16px);
+  font-weight: 700;
+  letter-spacing: 0.2px;
+  cursor: pointer;
+  transition: var(--transition);
+  position: sticky;
+  bottom: env(safe-area-inset-bottom, 16px);
+  box-shadow: 0 8px 28px rgba(255,94,94,0.3);
+  min-height: 52px;
+}
+.create-btn:active { transform: scale(0.97); box-shadow: 0 4px 14px rgba(255,94,94,0.2); }
+.create-btn.disabled {
+  background: var(--muted);
+  color: var(--sub);
+  box-shadow: none;
+  cursor: default;
+  pointer-events: none;
+}
+
+/* ── BOTTOM SHEET ── */
+.sheet-backdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(8,8,16,0.8);
+  backdrop-filter: blur(6px);
+  z-index: 100;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.22s ease;
+}
+.sheet-backdrop.open { opacity: 1; pointer-events: all; }
+.bottom-sheet {
+  position: fixed;
+  bottom: 0; left: 50%;
+  transform: translateX(-50%) translateY(100%);
+  width: 100%;
+  max-width: 390px;
+  background: var(--surface);
+  border-radius: 20px 20px 0 0;
+  border: 1.5px solid var(--border2);
+  border-bottom: none;
+  z-index: 101;
+  padding: 16px;
+  transition: transform 0.3s cubic-bezier(0.34,1.2,0.64,1);
+  padding-bottom: env(safe-area-inset-bottom, 20px);
+}
+.bottom-sheet.open { transform: translateX(-50%) translateY(0); }
+.sheet-handle {
+  width: 36px; height: 4px;
+  border-radius: 2px;
+  background: var(--border2);
+  margin: 0 auto 16px;
+}
+.sheet-title {
+  font-family: var(--mono);
+  font-size: 10px;
+  letter-spacing: 2px;
+  text-transform: uppercase;
+  color: var(--sub);
+  margin-bottom: 12px;
+}
+.sound-option {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 13px 14px;
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  transition: var(--transition);
+  min-height: 48px;
+}
+.sound-option:active { background: var(--card2); transform: scale(0.98); }
+.sound-option.active { background: rgba(0,255,170,0.08); border: 1px solid rgba(0,255,170,0.15); }
+.sound-opt-name {
+  display: flex; align-items: center; gap: 10px;
+  font-size: clamp(13px, 3.5vw, 14px);
+  font-weight: 500;
+}
+.sound-check {
+  width: 18px; height: 18px;
+  border-radius: 50%;
+  border: 1.5px solid var(--border2);
+  display: flex; align-items: center; justify-content: center;
+  font-size: 10px;
+  transition: var(--transition);
+}
+.sound-option.active .sound-check {
+  background: var(--green);
+  border-color: var(--green);
+  color: #080810;
+}
+
+/* ── LONG BLOCK WARN ── */
+.long-block-warn {
+  font-family: var(--mono);
+  font-size: 10px;
+  color: var(--yellow);
+  letter-spacing: 0.3px;
+  opacity: 0;
+  max-height: 0;
+  overflow: hidden;
+  transition: opacity 0.2s, max-height 0.2s;
+  text-align: center;
+  padding: 0;
+}
+.long-block-warn.show { opacity: 1; max-height: 20px; padding: 2px 0; }
+
+</style>
+</head>
+<body>
+
+<div class="phone-frame">
+
+  <!-- HEADER -->
+  <div class="header">
+    <div class="back-btn" onclick="history.back()">←</div>
+    <div class="header-title">New Task</div>
+    <div class="header-date" id="todayDate"></div>
+  </div>
+
+  <!-- FORM -->
+  <div class="form-wrap" id="formWrap">
+
+    <!-- MIT TOGGLE -->
+    <div class="mit-row" id="mitRow" onclick="toggleMIT()">
+      <div class="mit-label">
+        <span class="mit-icon">🔥</span>
+        Most important task today
+      </div>
+      <div class="toggle-pill" id="mitPill">
+        <div class="toggle-knob"></div>
+      </div>
+    </div>
+
+    <!-- TASK NAME -->
+    <div class="input-wrap">
+      <div class="input-emoji">😊</div>
+      <input 
+        class="task-input" 
+        id="taskInput"
+        type="text" 
+        placeholder="What needs doing?" 
+        maxlength="60"
+        autocomplete="off"
+        oninput="onTaskInput(this)"
+      >
+      <span class="char-count" id="charCount">0/60</span>
+    </div>
+
+    <!-- CATEGORY -->
+    <div class="section-label">Category → tag + sound</div>
+    <div class="category-scroll">
+      <div class="category-row" id="catRow">
+        <div class="cat-chip" onclick="selectCat(this,'Rain + Brown noise')"><span class="cat-emoji">🫀</span>Health</div>
+        <div class="cat-chip" onclick="selectCat(this,'Energetic beats')"><span class="cat-emoji">💪</span>Fitness</div>
+        <div class="cat-chip" onclick="selectCat(this,'Rain + Brown noise')"><span class="cat-emoji">📚</span>Learning</div>
+        <div class="cat-chip" onclick="selectCat(this,'Ambient no-lyrics')"><span class="cat-emoji">✅</span>Productivity</div>
+        <div class="cat-chip" onclick="selectCat(this,'Ambient no-lyrics')"><span class="cat-emoji">🎨</span>Creative</div>
+        <div class="cat-chip" onclick="selectCat(this,'No sound')"><span class="cat-emoji">🍎</span>Food</div>
+        <div class="cat-chip" onclick="selectCat(this,'No sound')"><span class="cat-emoji">👥</span>Social</div>
+        <div class="cat-chip" onclick="selectCat(this,'No sound')"><span class="cat-emoji">💰</span>Finance</div>
+        <div class="cat-chip" onclick="selectCat(this,'Rain + Brown noise')"><span class="cat-emoji">🌿</span>Nature</div>
+        <div class="cat-chip" onclick="selectCat(this,'No sound')"><span class="cat-emoji">🚗</span>Transport</div>
+        <div class="cat-chip" onclick="selectCat(this,'No sound')"><span class="cat-emoji">🏠</span>Home</div>
+        <div class="cat-chip" onclick="selectCat(this,'Ambient no-lyrics')"><span class="cat-emoji">🧘</span>Mental</div>
+      </div>
+    </div>
+
+    <!-- SOUND ROW (hidden until category picked) -->
+    <div class="sound-row" id="soundRow" onclick="openSoundSheet()">
+      <div class="sound-left">
+        <span class="sound-icon">🎵</span>
+        <span class="sound-name" id="soundName">Rain + Brown noise</span>
+      </div>
+      <span class="sound-change">Change</span>
+    </div>
+
+    <!-- TIME -->
+    <div class="section-label">When?</div>
+    <div class="time-block">
+      <div class="time-row">
+        <div class="time-pill" onclick="pickTime('start')">
+          <div class="time-label">Start</div>
+          <div class="time-value" id="startVal">09:00</div>
+        </div>
+        <div class="time-arrow">→</div>
+        <div class="time-pill" onclick="pickTime('end')">
+          <div class="time-label">End</div>
+          <div class="time-value" id="endVal">10:00</div>
+        </div>
+        <div class="duration-badge">
+          <div class="duration-dot"></div>
+          <div class="duration-text" id="durText">60m</div>
+        </div>
+      </div>
+      <div class="next-day-warn" id="nextDayWarn">⚡ Ends next day</div>
+      <div class="long-block-warn" id="longWarn">⚠ That's a long block — sure?</div>
+      <div class="duration-pills">
+        <div class="dur-pill" onclick="setDur(this,15)">15m</div>
+        <div class="dur-pill" onclick="setDur(this,25)">25m</div>
+        <div class="dur-pill active" onclick="setDur(this,60)">1h</div>
+        <div class="dur-pill" onclick="setDur(this,30)">30m</div>
+        <div class="dur-pill" onclick="setDur(this,45)">45m</div>
+        <div class="dur-pill" onclick="setDur(this,90)">1h 30m</div>
+        <div class="dur-pill" onclick="setDur(this,120)">2h</div>
+      </div>
+    </div>
+
+    <!-- REPEAT -->
+    <div class="repeat-row" onclick="toggleRepeat()">
+      <div class="repeat-label">🔁 Repeat</div>
+      <div class="toggle-pill" id="repeatPill">
+        <div class="toggle-knob"></div>
+      </div>
+    </div>
+    <div class="repeat-expand" id="repeatExpand">
+      <div class="repeat-freq-row">
+        <div class="freq-chip active" onclick="setFreq(this)">Once</div>
+        <div class="freq-chip" onclick="setFreq(this)">Daily</div>
+        <div class="freq-chip" onclick="setFreq(this)">Weekdays</div>
+        <div class="freq-chip" onclick="setFreq(this)">Custom</div>
+      </div>
+      <div class="days-row" id="daysRow">
+        <div class="day-dot" onclick="toggleDay(this)">M</div>
+        <div class="day-dot" onclick="toggleDay(this)">T</div>
+        <div class="day-dot" onclick="toggleDay(this)">W</div>
+        <div class="day-dot" onclick="toggleDay(this)">T</div>
+        <div class="day-dot" onclick="toggleDay(this)">F</div>
+        <div class="day-dot" onclick="toggleDay(this)">S</div>
+        <div class="day-dot" onclick="toggleDay(this)">S</div>
+      </div>
+    </div>
+
+    <!-- NOTES -->
+    <div class="notes-toggle" id="notesToggle" onclick="toggleNotes()">
+      <span>+</span> Add note (optional)
+    </div>
+    <div class="notes-area-wrap" id="notesWrap">
+      <textarea class="notes-area" placeholder="Any details..."></textarea>
+    </div>
+
+  </div>
+
+  <!-- CREATE BUTTON -->
+  <button class="create-btn disabled" id="createBtn">Create task →</button>
+
+</div>
+
+<!-- SOUND BOTTOM SHEET -->
+<div class="sheet-backdrop" id="backdrop" onclick="closeSheet()"></div>
+<div class="bottom-sheet" id="soundSheet">
+  <div class="sheet-handle"></div>
+  <div class="sheet-title">Ambient Sound</div>
+  <div class="sound-option active" onclick="pickSound(this,'Rain + Brown noise','🌧')">
+    <div class="sound-opt-name"><span>🌧</span> Rain + Brown noise</div>
+    <div class="sound-check">✓</div>
+  </div>
+  <div class="sound-option" onclick="pickSound(this,'Energetic beats','⚡')">
+    <div class="sound-opt-name"><span>⚡</span> Energetic beats</div>
+    <div class="sound-check"></div>
+  </div>
+  <div class="sound-option" onclick="pickSound(this,'Ambient no-lyrics','🎼')">
+    <div class="sound-opt-name"><span>🎼</span> Ambient no-lyrics</div>
+    <div class="sound-check"></div>
+  </div>
+  <div class="sound-option" onclick="pickSound(this,'Brown noise','🟤')">
+    <div class="sound-opt-name"><span>🟤</span> Brown noise</div>
+    <div class="sound-check"></div>
+  </div>
+  <div class="sound-option" onclick="pickSound(this,'No sound','🔇')">
+    <div class="sound-opt-name"><span>🔇</span> No sound</div>
+    <div class="sound-check"></div>
+  </div>
+</div>
+
+<script>
+// ── DATE ──
+const d = new Date();
+document.getElementById('todayDate').textContent =
+  d.toLocaleDateString('en-IN',{day:'numeric',month:'short',year:'numeric'});
+
+// ── MIT ──
+let mitOn = false;
+function toggleMIT() {
+  mitOn = !mitOn;
+  document.getElementById('mitRow').classList.toggle('on', mitOn);
+  document.getElementById('mitPill').classList.toggle('on', mitOn);
+  document.getElementById('formWrap').classList.toggle('mit-active', mitOn);
+}
+
+// ── TASK INPUT ──
+function onTaskInput(el) {
+  const len = el.value.length;
+  const cc = document.getElementById('charCount');
+  cc.textContent = len + '/60';
+  cc.classList.toggle('visible', len >= 40);
+  cc.classList.toggle('warn', len >= 50);
+  document.getElementById('createBtn').classList.toggle('disabled', len === 0);
+}
+
+// ── CATEGORY ──
+function selectCat(el, sound) {
+  document.querySelectorAll('.cat-chip').forEach(c => c.classList.remove('selected'));
+  el.classList.add('selected');
+  document.getElementById('soundName').textContent = sound;
+  document.getElementById('soundRow').classList.add('visible');
+  // bounce the sound row
+  const sr = document.getElementById('soundRow');
+  sr.style.transform = 'scale(1.02)';
+  setTimeout(()=>{ sr.style.transform=''; }, 180);
+}
+
+// ── TIME & DURATION ──
+let startMinutes = 9*60, endMinutes = 10*60;
+
+function fmtTime(mins) {
+  const h = String(Math.floor(mins/60)%24).padStart(2,'0');
+  const m = String(mins%60).padStart(2,'0');
+  return h+':'+m;
+}
+
+function updateTimeDisplay() {
+  document.getElementById('startVal').textContent = fmtTime(startMinutes);
+  document.getElementById('endVal').textContent = fmtTime(endMinutes);
+  let diff = endMinutes - startMinutes;
+  const nextDay = diff < 0;
+  if (nextDay) diff += 24*60;
+  const h = Math.floor(diff/60), m = diff%60;
+  let label = h > 0 ? h+'h' : '';
+  if (m > 0) label += (label?' ':'') + m+'m';
+  document.getElementById('durText').textContent = label || '0m';
+  document.getElementById('nextDayWarn').classList.toggle('show', nextDay);
+  document.getElementById('longWarn').classList.toggle('show', diff > 240 && !nextDay);
+}
+
+function setDur(el, mins) {
+  document.querySelectorAll('.dur-pill').forEach(p=>p.classList.remove('active'));
+  el.classList.add('active');
+  endMinutes = startMinutes + mins;
+  updateTimeDisplay();
+  el.style.transform='scale(0.88)';
+  setTimeout(()=>{el.style.transform='';},160);
+}
+
+function pickTime(which) {
+  const cur = which==='start' ? fmtTime(startMinutes) : fmtTime(endMinutes);
+  const input = document.createElement('input');
+  input.type='time'; input.value=cur;
+  input.style.position='fixed'; input.style.opacity='0';
+  document.body.appendChild(input);
+  input.focus(); input.click();
+  input.addEventListener('change',()=>{
+    const [h,m] = input.value.split(':').map(Number);
+    if(which==='start') startMinutes = h*60+m;
+    else endMinutes = h*60+m;
+    updateTimeDisplay();
+    document.body.removeChild(input);
+  });
+  setTimeout(()=>{ if(document.body.contains(input)) document.body.removeChild(input); },5000);
+}
+
+// ── REPEAT ──
+let repeatOn = false;
+function toggleRepeat() {
+  repeatOn = !repeatOn;
+  document.getElementById('repeatPill').classList.toggle('on', repeatOn);
+  document.getElementById('repeatExpand').classList.toggle('open', repeatOn);
+}
+function setFreq(el) {
+  document.querySelectorAll('.freq-chip').forEach(c=>c.classList.remove('active'));
+  el.classList.add('active');
+  document.getElementById('daysRow').classList.toggle('open', el.textContent==='Custom');
+}
+function toggleDay(el) {
+  el.classList.toggle('on');
+  el.style.transform='scale(0.85)';
+  setTimeout(()=>{el.style.transform='';},140);
+}
+
+// ── NOTES ──
+let notesOpen = false;
+function toggleNotes() {
+  notesOpen = !notesOpen;
+  document.getElementById('notesToggle').classList.toggle('open', notesOpen);
+  document.getElementById('notesWrap').classList.toggle('open', notesOpen);
+  if(notesOpen) setTimeout(()=>document.querySelector('.notes-area').focus(),250);
+}
+
+// ── SOUND SHEET ──
+function openSoundSheet() {
+  document.getElementById('backdrop').classList.add('open');
+  document.getElementById('soundSheet').classList.add('open');
+}
+function closeSheet() {
+  document.getElementById('backdrop').classList.remove('open');
+  document.getElementById('soundSheet').classList.remove('open');
+}
+function pickSound(el, name) {
+  document.querySelectorAll('.sound-option').forEach(o=>{
+    o.classList.remove('active');
+    o.querySelector('.sound-check').textContent='';
+  });
+  el.classList.add('active');
+  el.querySelector('.sound-check').textContent='✓';
+  document.getElementById('soundName').textContent = name;
+  setTimeout(closeSheet, 160);
+}
+
+// ── INIT ──
+updateTimeDisplay();
+document.getElementById('taskInput').focus();
+</script>
+
+</body>
+</html>

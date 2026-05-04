@@ -14,6 +14,13 @@ describe('FocusFlow API (e2e)', () => {
       onModuleInit: () => undefined,
       onModuleDestroy: () => undefined,
       $queryRaw: jest.fn().mockResolvedValue([{ ok: 1 }]),
+      appConfig: {
+        findMany: jest.fn().mockResolvedValue([]),
+        findUnique: jest.fn().mockResolvedValue(null),
+      },
+      errorLog: {
+        create: jest.fn().mockResolvedValue({ id: 'e1' }),
+      },
     };
 
     const moduleFixture: TestingModule = await Test.createTestingModule({
@@ -56,6 +63,29 @@ describe('FocusFlow API (e2e)', () => {
       .expect((res) => {
         expect(res.headers['x-request-id']).toBe('client-trace-123');
       });
+  });
+
+  it('GET /v1/config/public — list (mocked)', () => {
+    return request(app.getHttpServer())
+      .get('/v1/config/public')
+      .expect(200)
+      .expect((res) => {
+        expect(Array.isArray(res.body)).toBe(true);
+      });
+  });
+
+  it('POST /v1/errors/report — accepts payload (mocked)', () => {
+    return request(app.getHttpServer())
+      .post('/v1/errors/report')
+      .send({
+        errorType: 'TEST',
+        message: 'hello',
+        surfaceMessage: 'Something went wrong',
+        screen: 'Inbox',
+        appVersion: '1.0.0',
+        deviceOs: 'android',
+      })
+      .expect(201);
   });
 
   afterEach(async () => {

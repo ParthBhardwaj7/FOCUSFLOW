@@ -33,13 +33,7 @@ class FocusAudioHandler extends BaseAudioHandler with SeekHandler {
     required String title,
   }) async {
     _activeAssetPath = assetPath;
-    mediaItem.add(
-      MediaItem(
-        id: assetPath,
-        title: title,
-        album: 'FocusFlow',
-      ),
-    );
+    mediaItem.add(MediaItem(id: assetPath, title: title, album: 'FocusFlow'));
     try {
       await _player.setAudioSource(AudioSource.asset(assetPath));
       await _player.setLoopMode(LoopMode.one);

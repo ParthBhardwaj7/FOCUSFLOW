@@ -1,10 +1,14 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import 'core/dev_config.dart';
 import 'core/models/user_model.dart';
+import 'core/router_refresh.dart';
 import 'core/session/session_controller.dart';
+import 'core/session/session_restore_budgets.dart';
 import 'features/add_task/add_task_page.dart';
 import 'features/ai/ai_page.dart';
 import 'features/auth/login_page.dart';
@@ -15,23 +19,37 @@ import 'features/inbox/inbox_page.dart';
 import 'features/inbox/note_editor_page.dart';
 import 'features/onboarding/day0_page.dart';
 import 'features/now/now_page.dart';
+import 'features/settings/coach_context_page.dart';
+import 'features/settings/focus_profile_page.dart';
+import 'features/recording/presentation/recording_screen.dart';
 import 'features/settings/settings_page.dart';
 import 'features/shell/main_shell_scaffold.dart';
+import 'services/timeline_notifications/timeline_notification_sync_host.dart';
 
 final goRouterProvider = Provider<GoRouter>((ref) {
+  debugPrint('[DEBUG] goRouterProvider building');
+  final refresh = ref.watch(goRouterRefreshProvider);
+  debugPrint('[DEBUG] goRouterRefreshProvider loaded');
+  
   final router = GoRouter(
+    refreshListenable: refresh,
     initialLocation: kDevAuthBypass ? '/now' : '/splash',
     redirect: (context, state) {
+      debugPrint('[DEBUG] GoRouter redirect: ${state.matchedLocation}');
       final loc = state.matchedLocation;
       final async = ref.read(sessionProvider);
+      debugPrint('[DEBUG] sessionProvider state: loading=${async.isLoading}, hasValue=${async.hasValue}, hasError=${async.hasError}');
 
       if (loc == '/focus' ||
           loc == '/deep-focus' ||
+          loc == '/settings/focus-profile' ||
+          loc == '/settings/coach-context' ||
           loc.startsWith('/inbox/notes')) {
         return null;
       }
 
       if (kDevAuthBypass) {
+        debugPrint('[DEBUG] Dev auth bypass enabled, redirecting to /now');
         if (loc == '/splash' || loc.startsWith('/auth') || loc == '/day0') {
           return '/now';
         }
@@ -92,23 +110,21 @@ final goRouterProvider = Provider<GoRouter>((ref) {
         path: '/auth/register',
         builder: (context, state) => const RegisterPage(),
       ),
-      GoRoute(
-        path: '/day0',
-        builder: (context, state) => const Day0Page(),
-      ),
+      GoRoute(path: '/day0', builder: (context, state) => const Day0Page()),
       GoRoute(
         path: '/inbox/notes/new',
         builder: (context, state) => const NoteEditorPage(),
       ),
       GoRoute(
         path: '/inbox/notes/:noteId',
-        builder: (context, state) => NoteEditorPage(
-          noteId: state.pathParameters['noteId']!,
-        ),
+        builder: (context, state) =>
+            NoteEditorPage(noteId: state.pathParameters['noteId']!),
       ),
       StatefulShellRoute.indexedStack(
         builder: (context, state, navigationShell) {
-          return MainShellScaffold(navigationShell: navigationShell);
+          return TimelineNotificationSyncHost(
+            child: MainShellScaffold(navigationShell: navigationShell),
+          );
         },
         branches: [
           StatefulShellBranch(
@@ -129,10 +145,7 @@ final goRouterProvider = Provider<GoRouter>((ref) {
           ),
           StatefulShellBranch(
             routes: [
-              GoRoute(
-                path: '/ai',
-                builder: (context, state) => const AiPage(),
-              ),
+              GoRoute(path: '/ai', builder: (context, state) => const AiPage()),
             ],
           ),
           StatefulShellBranch(
@@ -146,10 +159,27 @@ final goRouterProvider = Provider<GoRouter>((ref) {
         ],
       ),
       GoRoute(
+        path: '/settings/focus-profile',
+        builder: (context, state) => const FocusProfilePage(),
+      ),
+      GoRoute(
+        path: '/settings/coach-context',
+        builder: (context, state) => const CoachContextPage(),
+      ),
+      GoRoute(
+        path: '/recordings',
+        builder: (context, state) => const RecordingScreen(),
+      ),
+      GoRoute(
         path: '/add-task',
         builder: (context, state) {
           final extra = state.extra as AddTaskRouteArgs?;
-          return AddTaskPage(initialTitle: extra?.initialTitle);
+          return AddTaskPage(
+            initialTitle: extra?.initialTitle,
+            initialDate: extra?.initialDate,
+            existingSlotId: extra?.existingSlotId,
+            initialDurationMin: extra?.initialDurationMin,
+          );
         },
       ),
       GoRoute(
@@ -169,10 +199,7 @@ final goRouterProvider = Provider<GoRouter>((ref) {
     ],
   );
 
-  ref.listen<AsyncValue<UserModel?>>(sessionProvider, (previous, next) {
-    router.refresh();
-  });
-
+  ref.onDispose(router.dispose);
   return router;
 });
 
@@ -186,11 +213,11 @@ class FocusRouteArgs {
   });
 
   const FocusRouteArgs.demo()
-      : title = 'Demo focus',
-        plannedSeconds = 300,
-        sessionId = null,
-        taskId = null,
-        markOnboardingComplete = true;
+    : title = 'Demo focus',
+      plannedSeconds = 300,
+      sessionId = null,
+      taskId = null,
+      markOnboardingComplete = true;
 
   final String title;
   final int plannedSeconds;
@@ -211,13 +238,13 @@ class DeepFocusRouteArgs {
   });
 
   const DeepFocusRouteArgs.demo()
-      : title = 'Demo deep focus',
-        plannedSeconds = 300,
-        sessionId = null,
-        taskId = null,
-        audioAssetPath = null,
-        markOnboardingComplete = false,
-        holdToExit = false;
+    : title = 'Demo deep focus',
+      plannedSeconds = 300,
+      sessionId = null,
+      taskId = null,
+      audioAssetPath = null,
+      markOnboardingComplete = false,
+      holdToExit = false;
 
   final String title;
   final int plannedSeconds;
@@ -228,8 +255,48 @@ class DeepFocusRouteArgs {
   final bool holdToExit;
 }
 
-class _SplashPage extends StatelessWidget {
+/// Shown while [sessionProvider] is loading on cold start.
+/// A safety timer redirects to /auth/login after [kSplashSafetyTimeout] so the
+/// app never gets stuck on infinite splash — timed **after** [kSessionRestoreTimeout]
+/// so we do not race the session restore timeout.
+class _SplashPage extends ConsumerStatefulWidget {
   const _SplashPage();
+
+  @override
+  ConsumerState<_SplashPage> createState() => _SplashPageState();
+}
+
+class _SplashPageState extends ConsumerState<_SplashPage> {
+  Timer? _safetyTimer;
+  ProviderSubscription<AsyncValue<UserModel?>>? _sessionSub;
+
+  @override
+  void initState() {
+    super.initState();
+    _sessionSub = ref.listenManual<AsyncValue<UserModel?>>(
+      sessionProvider,
+      (prev, next) {
+        if (!next.isLoading) {
+          _safetyTimer?.cancel();
+          _safetyTimer = null;
+        }
+      },
+    );
+    _safetyTimer = Timer(kSplashSafetyTimeout, () {
+      final async = ref.read(sessionProvider);
+      if (!mounted) return;
+      if (async.isLoading) {
+        context.go('/auth/login');
+      }
+    });
+  }
+
+  @override
+  void dispose() {
+    _sessionSub?.close();
+    _safetyTimer?.cancel();
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -248,7 +315,9 @@ class _SplashPage extends StatelessWidget {
             Text(
               'FocusFlow',
               style: TextStyle(
-                color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.85),
+                color: Theme.of(
+                  context,
+                ).colorScheme.onSurface.withValues(alpha: 0.85),
                 fontWeight: FontWeight.w700,
                 letterSpacing: 0.5,
               ),

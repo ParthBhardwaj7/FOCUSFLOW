@@ -1,0 +1,3 @@
+# Root-level prototypes and document exports (not used by mobile/backend builds)
+/*.docx
+/Weeklystrip.html

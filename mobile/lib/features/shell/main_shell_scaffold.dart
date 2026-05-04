@@ -1,12 +1,15 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
+import '../inbox/inbox_providers.dart';
 import '../timeline/timeline_tokens.dart';
+import 'shell_tab_scope.dart';
 
 /// Full-width shell footer height — keep in sync with timeline FAB / scroll padding.
 const double kFocusFlowShellNavHeight = 72;
 
-class MainShellScaffold extends StatelessWidget {
+class MainShellScaffold extends ConsumerWidget {
   const MainShellScaffold({super.key, required this.navigationShell});
 
   final StatefulNavigationShell navigationShell;
@@ -20,23 +23,28 @@ class MainShellScaffold extends StatelessWidget {
   ];
 
   @override
-  Widget build(BuildContext context) {
-    return ColoredBox(
-      color: TimelineTokens.bg,
-      child: Column(
-        children: [
-          Expanded(child: navigationShell),
-          SafeArea(
-            top: false,
-            child: _ShellBottomBar(
-              currentIndex: navigationShell.currentIndex,
-              onTap: (i) => navigationShell.goBranch(
-                i,
-                initialLocation: i == navigationShell.currentIndex,
+  Widget build(BuildContext context, WidgetRef ref) {
+    final inboxBadge = ref.watch(inboxTabBadgeCountProvider);
+    return ShellTabIndexScope(
+      currentIndex: navigationShell.currentIndex,
+      child: ColoredBox(
+        color: TimelineTokens.scaffoldBg(context),
+        child: Column(
+          children: [
+            Expanded(child: navigationShell),
+            SafeArea(
+              top: false,
+              child: _ShellBottomBar(
+                currentIndex: navigationShell.currentIndex,
+                inboxBadgeCount: inboxBadge,
+                onTap: (i) => navigationShell.goBranch(
+                  i,
+                  initialLocation: i == navigationShell.currentIndex,
+                ),
               ),
             ),
-          ),
-        ],
+          ],
+        ),
       ),
     );
   }
@@ -52,21 +60,32 @@ class _ShellTab {
 class _ShellBottomBar extends StatelessWidget {
   const _ShellBottomBar({
     required this.currentIndex,
+    required this.inboxBadgeCount,
     required this.onTap,
   });
 
   final int currentIndex;
+  final int inboxBadgeCount;
   final ValueChanged<int> onTap;
 
   @override
   Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+    final barBg = Color.alphaBlend(
+      scheme.surface.withValues(alpha: 0.94),
+      scheme.surfaceContainerLowest,
+    );
     return Material(
-      color: const Color(0xF50C0C10),
+      color: barBg,
       elevation: 0,
       child: Container(
         height: kFocusFlowShellNavHeight,
-        decoration: const BoxDecoration(
-          border: Border(top: BorderSide(color: TimelineTokens.border)),
+        decoration: BoxDecoration(
+          border: Border(
+            top: BorderSide(
+              color: scheme.outline.withValues(alpha: 0.35),
+            ),
+          ),
         ),
         padding: const EdgeInsets.fromLTRB(8, 6, 8, 10),
         child: Row(
@@ -78,6 +97,7 @@ class _ShellBottomBar extends StatelessWidget {
                 emoji: t.emoji,
                 label: t.label,
                 active: i == currentIndex,
+                showBadge: i == 0 && inboxBadgeCount > 0,
                 onTap: () => onTap(i),
               ),
             );
@@ -93,17 +113,20 @@ class _ShellNavItem extends StatelessWidget {
     required this.emoji,
     required this.label,
     required this.active,
+    required this.showBadge,
     required this.onTap,
   });
 
   final String emoji;
   final String label;
   final bool active;
+  final bool showBadge;
   final VoidCallback onTap;
 
   @override
   Widget build(BuildContext context) {
-    final labelColor = active ? TimelineTokens.accent : TimelineTokens.muted;
+    final scheme = Theme.of(context).colorScheme;
+    final labelColor = active ? scheme.primary : scheme.onSurfaceVariant;
 
     return InkWell(
       onTap: onTap,
@@ -112,24 +135,42 @@ class _ShellNavItem extends StatelessWidget {
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Text(
-              emoji,
-              style: TextStyle(
-                fontSize: 22,
-                height: 1,
-                shadows: active
-                    ? const [
-                        Shadow(
-                          color: Color(0x99FF5F5F),
-                          blurRadius: 10,
-                        ),
-                        Shadow(
-                          color: Color(0x66FF5F5F),
-                          blurRadius: 4,
-                        ),
-                      ]
-                    : null,
-              ),
+            Stack(
+              clipBehavior: Clip.none,
+              children: [
+                Text(
+                  emoji,
+                  style: TextStyle(
+                    fontSize: 24,
+                    height: 1,
+                    shadows: active
+                        ? [
+                            Shadow(
+                              color: scheme.primary.withValues(alpha: 0.55),
+                              blurRadius: 10,
+                            ),
+                            Shadow(
+                              color: scheme.primary.withValues(alpha: 0.38),
+                              blurRadius: 4,
+                            ),
+                          ]
+                        : null,
+                  ),
+                ),
+                if (showBadge)
+                  Positioned(
+                    right: -2,
+                    top: -2,
+                    child: Container(
+                      width: 8,
+                      height: 8,
+                      decoration: BoxDecoration(
+                        color: scheme.primary,
+                        shape: BoxShape.circle,
+                      ),
+                    ),
+                  ),
+              ],
             ),
             const SizedBox(height: 3),
             Text(
@@ -138,8 +179,8 @@ class _ShellNavItem extends StatelessWidget {
               overflow: TextOverflow.ellipsis,
               style: TextStyle(
                 fontFamily: 'monospace',
-                fontSize: 9,
-                fontWeight: FontWeight.w700,
+                fontSize: active ? 10.5 : 9,
+                fontWeight: active ? FontWeight.w800 : FontWeight.w700,
                 letterSpacing: 0.8,
                 color: labelColor,
               ),

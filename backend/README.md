@@ -134,7 +134,7 @@ Copy [`.env.example`](./.env.example) to `.env`. Never commit `.env`.
 | `DATABASE_URL` | Yes | Prisma PostgreSQL URL |
 | `SHADOW_DATABASE_URL` | No | Only if your host requires a shadow DB for migrations |
 | `JWT_ACCESS_SECRET` | Yes | Min **32** characters; access token signing |
-| `JWT_REFRESH_SECRET` | Yes | Min **32** characters; refresh token signing |
+| `JWT_REFRESH_SECRET` | No | Legacy optional key (refresh tokens are DB-backed, not JWT-signed) |
 | `JWT_ACCESS_EXPIRES_IN` | No | Default `15m` |
 | `JWT_REFRESH_EXPIRES_IN` | No | Default `7d` |
 | `CORS_ORIGINS` | Yes | Comma-separated allowed origins (no spaces) |
