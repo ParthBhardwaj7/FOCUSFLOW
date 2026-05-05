@@ -1,6 +1,7 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { PushTargetType, UserPlan, type Prisma } from '@prisma/client';
+import { resolveFcmServerKey, isFcmConfigured } from '../../common/utils/fcm-server-key';
 import { PrismaService } from '../../prisma/prisma.service';
 import { AuditLogService } from './audit-log.service';
 
@@ -72,7 +73,7 @@ export class AdminNotificationsService {
     });
     const warnings = this.buildDispatchWarnings(
       dispatchMeta,
-      Boolean(this.config.get<string>('FCM_SERVER_KEY')?.trim()),
+      isFcmConfigured(this.config),
     );
     return { ...notification, ...dispatchMeta, warnings };
   }
@@ -99,7 +100,7 @@ export class AdminNotificationsService {
     }
     if (!fcmConfigured) {
       w.push(
-        'FCM_SERVER_KEY is not set on the API — notification was recorded but not sent via FCM.',
+        'FCM server key is not set on the API (set FCM_SERVER_KEY or CM_SERVER_KEY) — notification was recorded but not sent via FCM.',
       );
     } else if (
       meta.deviceTokenCount > 0 &&
@@ -168,7 +169,7 @@ export class AdminNotificationsService {
     const tokens = deviceRows.map((d) => d.token);
     const deviceTokenCount = tokens.length;
 
-    const fcmKey = this.config.get<string>('FCM_SERVER_KEY')?.trim();
+    const fcmKey = resolveFcmServerKey(this.config);
     let fcmDelivered: number | undefined;
     if (fcmKey && tokens.length > 0) {
       fcmDelivered = await this.tryFcmLegacyMulticast(

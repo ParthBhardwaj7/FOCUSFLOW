@@ -18,6 +18,12 @@ String resolveApiBaseUrl() {
       'API_BASE_URL must be set in mobile/.env for release builds.',
     );
   }
+  // Profile is used for performance testing on real devices; do not guess localhost/emulator.
+  if (kProfileMode) {
+    throw StateError(
+      'API_BASE_URL must be set in mobile/.env for profile builds.',
+    );
+  }
   if (kDebugMode) {
     if (defaultTargetPlatform == TargetPlatform.android) {
       debugPrint(

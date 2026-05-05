@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../core/dio_errors.dart';
+import '../../core/models/user_model.dart';
 import '../../core/session/session_controller.dart';
 
 class RegisterPage extends ConsumerStatefulWidget {
@@ -15,23 +16,22 @@ class RegisterPage extends ConsumerStatefulWidget {
 class _RegisterPageState extends ConsumerState<RegisterPage> {
   final _email = TextEditingController();
   final _password = TextEditingController();
+  ProviderSubscription<AsyncValue<UserModel?>>? _sessionSub;
 
   @override
-  void dispose() {
-    _email.dispose();
-    _password.dispose();
-    super.dispose();
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    final session = ref.watch(sessionProvider);
-
-    ref.listen(sessionProvider, (prev, next) {
+  void initState() {
+    super.initState();
+    _sessionSub = ref.listenManual<AsyncValue<UserModel?>>(sessionProvider, (
+      prev,
+      next,
+    ) {
       next.whenOrNull(
-        error: (e, _) => ScaffoldMessenger.of(
-          context,
-        ).showSnackBar(SnackBar(content: Text(formatDioError(e)))),
+        error: (e, _) {
+          if (!mounted) return;
+          ScaffoldMessenger.of(
+            context,
+          ).showSnackBar(SnackBar(content: Text(formatDioError(e))));
+        },
         data: (user) {
           if (user == null || !context.mounted) return;
           WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -41,6 +41,19 @@ class _RegisterPageState extends ConsumerState<RegisterPage> {
         },
       );
     });
+  }
+
+  @override
+  void dispose() {
+    _sessionSub?.close();
+    _email.dispose();
+    _password.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final session = ref.watch(sessionProvider);
 
     return Scaffold(
       appBar: AppBar(title: const Text('Create account')),

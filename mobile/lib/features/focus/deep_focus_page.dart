@@ -142,28 +142,45 @@ class _DeepFocusPageState extends ConsumerState<DeepFocusPage> {
     final r = await showDialog<bool>(
       context: context,
       barrierDismissible: false,
-      builder: (ctx) => AlertDialog(
-        backgroundColor: TimelineTokens.card,
-        title: Text(title, style:  TextStyle(color: TimelineTokens.text)),
-        content: const Text(
-          'You chose this time to focus. Leaving now breaks the promise you made to yourself — '
-          'but stopping is still your choice.',
-          style: TextStyle(color: TimelineTokens.text, height: 1.4),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(ctx, false),
-            child: const Text('Stay focused'),
-          ),
-          FilledButton(
-            onPressed: () => Navigator.pop(ctx, true),
-            style: FilledButton.styleFrom(
-              backgroundColor: TimelineTokens.accent,
+      builder: (ctx) {
+        final cs = Theme.of(ctx).colorScheme;
+        final muted = cs.onSurfaceVariant;
+        return AlertDialog(
+          backgroundColor: cs.surface,
+          surfaceTintColor: Colors.transparent,
+          title: Text(
+            title,
+            style: TextStyle(
+              color: cs.onSurface,
+              fontWeight: FontWeight.w800,
             ),
-            child: const Text('Leave anyway'),
           ),
-        ],
-      ),
+          content: Text(
+            'You chose this time to focus. Leaving now breaks the promise you made to yourself — '
+            'but stopping is still your choice.',
+            style: TextStyle(
+              color: muted.withValues(alpha: 0.95),
+              height: 1.4,
+              fontSize: 14,
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(ctx, false),
+              style: TextButton.styleFrom(foregroundColor: muted),
+              child: const Text('Stay focused'),
+            ),
+            FilledButton(
+              onPressed: () => Navigator.pop(ctx, true),
+              style: FilledButton.styleFrom(
+                backgroundColor: cs.primary,
+                foregroundColor: cs.onPrimary,
+              ),
+              child: const Text('Leave anyway'),
+            ),
+          ],
+        );
+      },
     );
     return r == true;
   }
@@ -210,7 +227,7 @@ class _DeepFocusPageState extends ConsumerState<DeepFocusPage> {
           message: 'Hold 3s to exit',
           child: IconButton(
             icon: const Icon(Icons.close),
-            color: TimelineTokens.text,
+            color: TimelineTokens.adaptivePrimaryText(context),
             onPressed: () {
               ScaffoldMessenger.of(context).showSnackBar(
                 const SnackBar(
@@ -226,7 +243,7 @@ class _DeepFocusPageState extends ConsumerState<DeepFocusPage> {
     }
     return IconButton(
       icon: const Icon(Icons.close),
-      color: TimelineTokens.text,
+      color: TimelineTokens.adaptivePrimaryText(context),
       onPressed: () => unawaited(_onClosePressed()),
     );
   }
@@ -235,6 +252,13 @@ class _DeepFocusPageState extends ConsumerState<DeepFocusPage> {
   Widget build(BuildContext context) {
     final total = widget.args.plannedSeconds.clamp(1, 86400);
     final progress = _remaining / total;
+    final cs = Theme.of(context).colorScheme;
+    final primaryText = TimelineTokens.adaptivePrimaryText(context);
+    final secondaryText = TimelineTokens.adaptiveSecondaryText(context);
+    final borderSoft = TimelineTokens.adaptiveBorder(context);
+    final ctaColor = TimelineTokens.isLight(context)
+        ? cs.primary
+        : TimelineTokens.accent;
 
     return PopScope(
       canPop: false,
@@ -264,10 +288,10 @@ class _DeepFocusPageState extends ConsumerState<DeepFocusPage> {
                         vertical: 6,
                       ),
                       decoration: BoxDecoration(
-                        color: TimelineTokens.accent.withValues(alpha: 0.12),
+                        color: ctaColor.withValues(alpha: 0.12),
                         borderRadius: BorderRadius.circular(20),
                         border: Border.all(
-                          color: TimelineTokens.accent.withValues(alpha: 0.35),
+                          color: ctaColor.withValues(alpha: 0.35),
                         ),
                       ),
                       child: Row(
@@ -276,8 +300,8 @@ class _DeepFocusPageState extends ConsumerState<DeepFocusPage> {
                           Container(
                             width: 8,
                             height: 8,
-                            decoration: const BoxDecoration(
-                              color: TimelineTokens.accent,
+                            decoration: BoxDecoration(
+                              color: ctaColor,
                               shape: BoxShape.circle,
                             ),
                           ),
@@ -285,7 +309,7 @@ class _DeepFocusPageState extends ConsumerState<DeepFocusPage> {
                           Text(
                             'DEEP FOCUS',
                             style: TextStyle(
-                              color: TimelineTokens.accent,
+                              color: ctaColor,
                               fontSize: 10,
                               fontWeight: FontWeight.w800,
                               letterSpacing: 1.2,
@@ -313,8 +337,8 @@ class _DeepFocusPageState extends ConsumerState<DeepFocusPage> {
                       Text(
                         widget.args.title,
                         textAlign: TextAlign.center,
-                        style: const TextStyle(
-                          color: TimelineTokens.text,
+                        style: TextStyle(
+                          color: primaryText,
                           fontSize: 26,
                           fontWeight: FontWeight.w900,
                           height: 1.15,
@@ -334,8 +358,8 @@ class _DeepFocusPageState extends ConsumerState<DeepFocusPage> {
                               child: CircularProgressIndicator(
                                 value: progress.clamp(0.0, 1.0),
                                 strokeWidth: 10,
-                                backgroundColor: TimelineTokens.border,
-                                color: TimelineTokens.accent,
+                                backgroundColor: borderSoft,
+                                color: ctaColor,
                                 strokeCap: StrokeCap.round,
                               ),
                             ),
@@ -344,8 +368,8 @@ class _DeepFocusPageState extends ConsumerState<DeepFocusPage> {
                               children: [
                                 Text(
                                   _fmt(_remaining),
-                                  style: const TextStyle(
-                                    color: TimelineTokens.text,
+                                  style: TextStyle(
+                                    color: primaryText,
                                     fontSize: 44,
                                     fontWeight: FontWeight.w900,
                                     letterSpacing: 1,
@@ -355,9 +379,7 @@ class _DeepFocusPageState extends ConsumerState<DeepFocusPage> {
                                 Text(
                                   'Remaining',
                                   style: TextStyle(
-                                    color: TimelineTokens.muted.withValues(
-                                      alpha: 0.9,
-                                    ),
+                                    color: secondaryText.withValues(alpha: 0.95),
                                     fontSize: 12,
                                     fontWeight: FontWeight.w600,
                                     letterSpacing: 0.5,
@@ -375,10 +397,8 @@ class _DeepFocusPageState extends ConsumerState<DeepFocusPage> {
                             child: OutlinedButton(
                               onPressed: () => unawaited(_onSkipPressed()),
                               style: OutlinedButton.styleFrom(
-                                foregroundColor: TimelineTokens.text,
-                                side: const BorderSide(
-                                  color: TimelineTokens.border,
-                                ),
+                                foregroundColor: primaryText,
+                                side: BorderSide(color: borderSoft),
                                 padding: const EdgeInsets.symmetric(
                                   vertical: 14,
                                 ),
@@ -391,8 +411,10 @@ class _DeepFocusPageState extends ConsumerState<DeepFocusPage> {
                             child: FilledButton(
                               onPressed: () => unawaited(_onDonePressed()),
                               style: FilledButton.styleFrom(
-                                backgroundColor: TimelineTokens.accent,
-                                foregroundColor: Colors.white,
+                                backgroundColor: ctaColor,
+                                foregroundColor: TimelineTokens.isLight(context)
+                                    ? cs.onPrimary
+                                    : Colors.white,
                                 padding: const EdgeInsets.symmetric(
                                   vertical: 14,
                                 ),
@@ -429,6 +451,11 @@ class _HeadphoneToggle extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final glow = enabled && listening;
+    final cs = Theme.of(context).colorScheme;
+    final accent = TimelineTokens.isLight(context)
+        ? cs.primary
+        : TimelineTokens.accent;
+    final dim = TimelineTokens.adaptiveSecondaryText(context);
     return Material(
       color: Colors.transparent,
       child: InkWell(
@@ -445,7 +472,7 @@ class _HeadphoneToggle extends StatelessWidget {
               boxShadow: glow
                   ? [
                       BoxShadow(
-                        color: TimelineTokens.accent.withValues(alpha: 0.45),
+                        color: accent.withValues(alpha: 0.45),
                         blurRadius: 14,
                         spreadRadius: 0,
                       ),
@@ -455,8 +482,8 @@ class _HeadphoneToggle extends StatelessWidget {
             child: Icon(
               listening ? Icons.headphones : Icons.headset_off,
               color: enabled
-                  ? (glow ? TimelineTokens.accent : TimelineTokens.muted)
-                  : TimelineTokens.muted.withValues(alpha: 0.45),
+                  ? (glow ? accent : dim)
+                  : dim.withValues(alpha: 0.45),
               size: 26,
             ),
           ),

@@ -19,6 +19,7 @@ import '../timeline_local_provider.dart';
 import '../../data/inbox_local_store.dart';
 import '../../features/inbox/inbox_providers.dart';
 import '../../features/timeline/timeline_providers.dart';
+import '../../services/google_identity_provider.dart';
 import 'session_restore_budgets.dart';
 
 class SessionController extends AsyncNotifier<UserModel?> {
@@ -149,11 +150,17 @@ class SessionController extends AsyncNotifier<UserModel?> {
     }
   }
 
-  Future<void> loginWithGoogleIdToken(String idToken) async {
+  Future<void> loginWithGoogle({
+    required String idToken,
+    String? accessToken,
+  }) async {
     state = const AsyncLoading();
     state = await AsyncValue.guard(() async {
       final c = ref.read(focusFlowClientProvider);
-      final u = await c.loginWithGoogleIdToken(idToken);
+      final u = await c.loginWithGoogleTokens(
+        idToken: idToken,
+        accessToken: accessToken,
+      );
       markSignedInRemoteBootstrapEnqueued();
       unawaited(syncRuntimeRemote(c, signedIn: true, forceFlags: true));
       return u;
@@ -171,6 +178,7 @@ class SessionController extends AsyncNotifier<UserModel?> {
     }
     final c = ref.read(focusFlowClientProvider);
     await c.logout();
+    await clearGoogleSignInSession(ref.read(googleSignInProvider));
     state = const AsyncData(null);
     if (ref.mounted) notifyGoRouterAuthChanged(ref);
   }

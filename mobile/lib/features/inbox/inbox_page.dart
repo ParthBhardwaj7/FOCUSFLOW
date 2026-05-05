@@ -1242,36 +1242,6 @@ class _InboxPageState extends ConsumerState<InboxPage>
                                           ],
                                         ),
                                       ),
-                                      if (_voice.voiceState ==
-                                              InboxVoiceState.recording &&
-                                          _voice.interimTranscript.isNotEmpty)
-                                        Positioned.fill(
-                                          child: IgnorePointer(
-                                            child: Padding(
-                                              padding:
-                                                  const EdgeInsets.fromLTRB(
-                                                    18,
-                                                    18,
-                                                    96,
-                                                    8,
-                                                  ),
-                                              child: Align(
-                                                alignment: Alignment.topLeft,
-                                                child: Text(
-                                                  _voice.interimTranscript,
-                                                  style: TextStyle(
-                                                    color: TimelineTokens
-                                                        .adaptiveSecondaryText(
-                                                      context,
-                                                    ).withValues(alpha: 0.95),
-                                                    fontSize: 16,
-                                                    height: 1.35,
-                                                  ),
-                                                ),
-                                              ),
-                                            ),
-                                          ),
-                                        ),
                                       Positioned(
                                         right: 48,
                                         top: 6,

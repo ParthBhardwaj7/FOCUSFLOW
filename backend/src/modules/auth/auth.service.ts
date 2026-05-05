@@ -64,7 +64,24 @@ export class AuthService {
     return this.issueFreshSession(user.id, user.email);
   }
 
-  async loginWithGoogleIdToken(idToken: string) {
+  private async verifyGoogleAccessToken(accessToken: string) {
+    const res = await fetch(
+      `https://www.googleapis.com/oauth2/v3/userinfo?access_token=${encodeURIComponent(accessToken)}`,
+    );
+    if (!res.ok) {
+      throw new UnauthorizedException('Invalid Google access token');
+    }
+    const data = (await res.json()) as {
+      email?: string;
+      email_verified?: boolean;
+    };
+    return {
+      email: data.email?.trim().toLowerCase(),
+      emailVerified: data.email_verified === true,
+    };
+  }
+
+  async loginWithGoogleTokens(idToken: string, accessToken?: string) {
     const audience = this.config
       .getOrThrow<string>('GOOGLE_AUTH_CLIENT_IDS')
       .split(',')
@@ -84,7 +101,14 @@ export class AuthService {
       const ticket = await this.googleOAuth.verifyIdToken({ idToken, audience });
       payload = ticket.getPayload();
     } catch {
-      throw new UnauthorizedException('Invalid Google ID token');
+      if (!accessToken || accessToken.trim().length == 0) {
+        throw new UnauthorizedException('Invalid Google ID token');
+      }
+      const fallback = await this.verifyGoogleAccessToken(accessToken.trim());
+      payload = {
+        email: fallback.email,
+        email_verified: fallback.emailVerified,
+      };
     }
     const email = payload?.email?.trim().toLowerCase();
     const emailVerified = payload?.email_verified === true;

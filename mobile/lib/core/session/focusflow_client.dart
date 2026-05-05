@@ -397,10 +397,17 @@ class FocusFlowClient {
     return user;
   }
 
-  Future<UserModel> loginWithGoogleIdToken(String idToken) async {
+  Future<UserModel> loginWithGoogleTokens({
+    required String idToken,
+    String? accessToken,
+  }) async {
     final res = await _plain.post<Map<String, dynamic>>(
       '/v1/auth/google',
-      data: {'idToken': idToken},
+      data: {
+        'idToken': idToken,
+        if (accessToken != null && accessToken.trim().isNotEmpty)
+          'accessToken': accessToken.trim(),
+      },
     );
     await _persistTokens(res.data!);
     final user = UserModel.fromJson(res.data!['user'] as Map<String, dynamic>);

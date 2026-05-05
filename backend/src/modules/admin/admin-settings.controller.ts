@@ -21,6 +21,7 @@ import {
 } from './decorators/admin-user.decorator';
 import { AdminUsersService } from './admin-users.service';
 import { AdminAppConfigService } from './admin-app-config.service';
+import { isFcmConfigured } from '../../common/utils/fcm-server-key';
 import { assertSlackIncomingWebhookUrl } from '../../common/utils/slack-webhook-url';
 
 function clientIp(req: Request): string | null {
@@ -49,7 +50,7 @@ export class AdminSettingsController {
         this.config.get('LLM_API_KEY') &&
         this.config.get('LLM_MODEL'),
       ),
-      fcmConfigured: Boolean(this.config.get('FCM_SERVER_KEY')),
+      fcmConfigured: isFcmConfigured(this.config),
       hasSmtpHost: Boolean(this.config.get('SMTP_HOST')),
     };
   }

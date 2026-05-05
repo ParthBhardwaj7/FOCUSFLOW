@@ -51,6 +51,8 @@ const envSchema = z.object({
   ADMIN_JWT_ACCESS_EXPIRES_IN: z.string().default('15m'),
 
   FCM_SERVER_KEY: z.string().min(1).optional(),
+  /** Same as FCM legacy server key (optional alias). */
+  CM_SERVER_KEY: z.string().min(1).optional(),
   REDIS_URL: z.string().min(1).optional(),
   ADMIN_PANEL_URL: z.string().url().optional(),
   /** Public base URL for uploaded sound files (optional). */
@@ -75,6 +77,7 @@ function stripEmptyOptionalKeys(
     'JWT_REFRESH_SECRET',
     'ADMIN_JWT_ACCESS_SECRET',
     'FCM_SERVER_KEY',
+    'CM_SERVER_KEY',
     'REDIS_URL',
     'ADMIN_PANEL_URL',
     'SOUND_PUBLIC_BASE_URL',

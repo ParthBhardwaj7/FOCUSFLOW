@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'core/app_connectivity_sync_host.dart';
 import 'core/appearance_prefs.dart' show appearanceSettingsProvider, kAccentPalette;
 import 'features/recording/presentation/recording_sync_host.dart';
+import 'services/fcm_token_sync_host.dart';
 import 'router.dart';
 import 'theme/focusflow_theme.dart';
 
@@ -33,18 +34,23 @@ class FocusFlowApp extends ConsumerWidget {
     debugPrint('[DEBUG] themeMode loaded: ${sw.elapsedMilliseconds}ms');
     
     debugPrint('[DEBUG] Building widget tree');
-    return AppConnectivitySyncHost(
-      child: RecordingSyncHost(
-        child: MaterialApp.router(
-          title: 'FocusFlow',
-          theme: buildFocusFlowTheme(brightness: Brightness.light, accent: accent),
-          darkTheme: buildFocusFlowTheme(
-            brightness: Brightness.dark,
-            accent: accent,
+    return FcmTokenSyncHost(
+      child: AppConnectivitySyncHost(
+        child: RecordingSyncHost(
+          child: MaterialApp.router(
+            title: 'FocusFlow',
+            theme: buildFocusFlowTheme(
+              brightness: Brightness.light,
+              accent: accent,
+            ),
+            darkTheme: buildFocusFlowTheme(
+              brightness: Brightness.dark,
+              accent: accent,
+            ),
+            themeMode: themeMode,
+            routerConfig: router,
+            debugShowCheckedModeBanner: false,
           ),
-          themeMode: themeMode,
-          routerConfig: router,
-          debugShowCheckedModeBanner: false,
         ),
       ),
     );

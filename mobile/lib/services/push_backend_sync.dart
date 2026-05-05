@@ -13,7 +13,7 @@ import '../core/session/session_controller.dart';
 /// configure` → `FirebaseMessaging.instance.getToken()`), on sign-in, token
 /// refresh, and [AppLifecycleState.resumed].
 Future<void> registerPushTokenWithBackend(
-  Ref ref, {
+  WidgetRef ref, {
   required String deviceToken,
 }) async {
   final t = deviceToken.trim();

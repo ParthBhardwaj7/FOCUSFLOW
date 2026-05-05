@@ -139,7 +139,7 @@ const _kCategories = [
 const _kDurationsMin = [15, 25, 30, 45, 60, 90, 120];
 const _kTitleMaxLength = 60;
 
-enum _RepeatFreq { once, daily, weekdays, custom }
+enum _RepeatFreq { once, daily, weekdays, weekends, custom }
 
 class _SoundSheetOpt {
   const _SoundSheetOpt(this.label, this.emoji);
@@ -169,11 +169,36 @@ String? _encodeRepeatRule({
       return 'DAILY';
     case _RepeatFreq.weekdays:
       return 'WEEKDAYS';
+    case _RepeatFreq.weekends:
+      return 'WEEKENDS';
     case _RepeatFreq.custom:
       final sorted = customWeekdays.toList()..sort();
       if (sorted.isEmpty) return 'CUSTOM:1,2,3,4,5';
       return 'CUSTOM:${sorted.join(',')}';
   }
+}
+
+bool _calendarWeekdayMatchesRepeatRule(String? rule, int weekday) {
+  if (rule == null || rule.isEmpty) return false;
+  if (rule == 'ONCE') return false;
+  if (rule == 'DAILY') return true;
+  if (rule == 'WEEKDAYS') {
+    return weekday >= DateTime.monday && weekday <= DateTime.friday;
+  }
+  if (rule == 'WEEKENDS') {
+    return weekday == DateTime.saturday || weekday == DateTime.sunday;
+  }
+  if (rule.startsWith('CUSTOM:')) {
+    final tail = rule.substring(7);
+    final set = tail
+        .split(',')
+        .map((e) => int.tryParse(e.trim()))
+        .whereType<int>()
+        .where((d) => d >= DateTime.monday && d <= DateTime.sunday)
+        .toSet();
+    return set.contains(weekday);
+  }
+  return false;
 }
 
 String _fmtDuration(int minutes) {
@@ -294,6 +319,8 @@ class _AddTaskPageState extends ConsumerState<AddTaskPage> {
       _repeatFreq = _RepeatFreq.daily;
     } else if (r == 'WEEKDAYS') {
       _repeatFreq = _RepeatFreq.weekdays;
+    } else if (r == 'WEEKENDS') {
+      _repeatFreq = _RepeatFreq.weekends;
     } else if (r.startsWith('CUSTOM:')) {
       _repeatFreq = _RepeatFreq.custom;
       final tail = r.substring(7);
@@ -561,6 +588,9 @@ class _AddTaskPageState extends ConsumerState<AddTaskPage> {
       customWeekdays: _customWeekdays,
     );
 
+    const repeatFanoutForwardDays = 120;
+    final touchedDayOns = <String>{dayOn};
+
     try {
       if (editId != null) {
         final slot = TimelineSlotModel(
@@ -601,15 +631,65 @@ class _AddTaskPageState extends ConsumerState<AddTaskPage> {
           repeatRule: repeatRule,
         );
         await store.appendSlot(dayOn, slot);
+
+        if (repeatRule != null && repeatRule != 'ONCE') {
+          final stamp = DateTime.now().microsecondsSinceEpoch;
+          for (var i = 1; i <= repeatFanoutForwardDays; i++) {
+            final d = base.add(Duration(days: i));
+            if (!_calendarWeekdayMatchesRepeatRule(repeatRule, d.weekday)) {
+              continue;
+            }
+            final ymd = formatLocalYmd(d);
+            final startClone = DateTime(
+              d.year,
+              d.month,
+              d.day,
+              _start.hour,
+              _start.minute,
+            );
+            var endClone = DateTime(d.year, d.month, d.day, _end.hour, _end.minute);
+            if (_end.hour * 60 + _end.minute <=
+                _start.hour * 60 + _start.minute) {
+              endClone = endClone.add(const Duration(days: 1));
+            }
+            final st = _statusForSlot(startClone, endClone);
+            final daySlots = await store.readSlotsForDay(ymd);
+            final ord = daySlots.isEmpty
+                ? 0
+                : daySlots.map((e) => e.sortOrder).reduce(math.max) + 1;
+            final cid = 'l_${ymd}_${stamp}_$i';
+            final clone = TimelineSlotModel(
+              id: cid,
+              startsAt: startClone.toUtc(),
+              endsAt: endClone.toUtc(),
+              title: title,
+              iconKey: _iconKey,
+              tag: cat.tag,
+              soundLabel: _soundLabel,
+              status: st,
+              linkedTaskId: null,
+              sortOrder: ord,
+              isMit: _mit,
+              taskNotes: notes,
+              repeatRule: null,
+            );
+            await store.appendSlot(ymd, clone);
+            touchedDayOns.add(ymd);
+          }
+        }
       }
-      ref.read(plannerCloudSyncCoordinatorProvider).scheduleUpload(dayOn);
-      ref.invalidate(tasksForDayProvider(dayOn));
+      final sync = ref.read(plannerCloudSyncCoordinatorProvider);
+      for (final on in touchedDayOns) {
+        sync.scheduleUpload(on);
+        ref.invalidate(tasksForDayProvider(on));
+      }
       ref.invalidate(timelineSlotsProvider);
+      ref.invalidate(dayStripSummariesProvider);
       if (mounted) context.pop();
       unawaited(
         TimelineNotificationScheduler.syncFromLocalStore(
           store,
-          touchedDayOns: [dayOn],
+          touchedDayOns: touchedDayOns,
         ),
       );
       unawaited(DailyBehavioralScheduler.syncFromLocalStore(store));
@@ -1573,6 +1653,7 @@ class _RepeatEditor extends StatelessWidget {
     _RepeatFreq.once: 'Once',
     _RepeatFreq.daily: 'Daily',
     _RepeatFreq.weekdays: 'Weekdays',
+    _RepeatFreq.weekends: 'Weekends',
     _RepeatFreq.custom: 'Custom',
   };
 

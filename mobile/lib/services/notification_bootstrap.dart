@@ -38,6 +38,8 @@ class NotificationBootstrap {
   static const channelExecution = 'ff_execution';
   static const channelCoach = 'ff_coach';
   static const channelCelebrate = 'ff_celebrate';
+  /// Server-driven FCM payloads (admin / marketing) surfaced while app is foreground.
+  static const channelAdminPush = 'ff_admin_push';
 
   static var _initialized = false;
 
@@ -109,6 +111,14 @@ class NotificationBootstrap {
         'Wins',
         description: 'Forward-looking praise nudges',
         importance: Importance.defaultImportance,
+      ),
+    );
+    await android.createNotificationChannel(
+      const AndroidNotificationChannel(
+        channelAdminPush,
+        'Announcements',
+        description: 'Messages from FocusFlow (push)',
+        importance: Importance.high,
       ),
     );
   }

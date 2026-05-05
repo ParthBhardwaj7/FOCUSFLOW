@@ -2,6 +2,7 @@ import 'dart:async';
 
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
+import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
@@ -22,6 +23,20 @@ Future<void> main() async {
   
   await dotenv.load(fileName: '.env', isOptional: true);
   debugPrint('[DEBUG] dotenv.load: ${sw.elapsedMilliseconds}ms');
+
+  if (!kIsWeb) {
+    try {
+      await Firebase.initializeApp();
+      debugPrint('[DEBUG] Firebase.initializeApp OK: ${sw.elapsedMilliseconds}ms');
+    } catch (e, st) {
+      debugPrint('Firebase.initializeApp failed (remote push unavailable): $e\n$st');
+    }
+    try {
+      await NotificationBootstrap.init();
+    } catch (e, st) {
+      debugPrint('NotificationBootstrap.init failed: $e\n$st');
+    }
+  }
   
   if (kDebugMode) {
     debugPrint('FocusFlow API base URL: ${resolveApiBaseUrl()}');
@@ -30,15 +45,4 @@ Future<void> main() async {
   debugPrint('[DEBUG] About to runApp: ${sw.elapsedMilliseconds}ms');
   runApp(const ProviderScope(child: FocusFlowApp()));
   debugPrint('[DEBUG] runApp returned: ${sw.elapsedMilliseconds}ms');
-  
-  // Run after first frame so timezone + channel setup do not compete with initial
-  // layout (reduces "Skipped N frames" / Davey warnings on cold start in debug).
-  WidgetsBinding.instance.addPostFrameCallback((_) {
-    debugPrint('[DEBUG] First frame callback executing: ${sw.elapsedMilliseconds}ms');
-    unawaited(
-      NotificationBootstrap.init().catchError((Object e, StackTrace st) {
-        debugPrint('NotificationBootstrap.init failed: $e');
-      }),
-    );
-  });
 }

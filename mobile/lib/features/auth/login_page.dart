@@ -1,11 +1,11 @@
 import 'package:flutter/material.dart';
-import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
-import 'package:google_sign_in/google_sign_in.dart';
 
 import '../../core/dio_errors.dart';
+import '../../core/models/user_model.dart';
 import '../../core/session/session_controller.dart';
+import '../../services/google_identity_provider.dart';
 
 class LoginPage extends ConsumerStatefulWidget {
   const LoginPage({super.key});
@@ -17,22 +17,37 @@ class LoginPage extends ConsumerStatefulWidget {
 class _LoginPageState extends ConsumerState<LoginPage> {
   final _email = TextEditingController();
   final _password = TextEditingController();
-  late final GoogleSignIn _googleSignIn;
+  ProviderSubscription<AsyncValue<UserModel?>>? _sessionSub;
 
   @override
   void initState() {
     super.initState();
-    final serverClientId = dotenv.env['GOOGLE_WEB_CLIENT_ID']?.trim();
-    _googleSignIn = GoogleSignIn(
-      scopes: const ['email', 'profile'],
-      serverClientId: serverClientId != null && serverClientId.isNotEmpty
-          ? serverClientId
-          : null,
-    );
+    // Single subscription (not per-frame [build]) so navigation / errors are not duplicated.
+    _sessionSub = ref.listenManual<AsyncValue<UserModel?>>(sessionProvider, (
+      prev,
+      next,
+    ) {
+      next.whenOrNull(
+        error: (e, _) {
+          if (!mounted) return;
+          ScaffoldMessenger.of(
+            context,
+          ).showSnackBar(SnackBar(content: Text(formatDioError(e))));
+        },
+        data: (user) {
+          if (user == null || !context.mounted) return;
+          WidgetsBinding.instance.addPostFrameCallback((_) {
+            if (!context.mounted) return;
+            context.go(user.needsOnboarding ? '/day0' : '/now');
+          });
+        },
+      );
+    });
   }
 
   @override
   void dispose() {
+    _sessionSub?.close();
     _email.dispose();
     _password.dispose();
     super.dispose();
@@ -52,22 +67,6 @@ class _LoginPageState extends ConsumerState<LoginPage> {
   @override
   Widget build(BuildContext context) {
     final session = ref.watch(sessionProvider);
-
-    ref.listen(sessionProvider, (prev, next) {
-      next.whenOrNull(
-        error: (e, _) => ScaffoldMessenger.of(
-          context,
-        ).showSnackBar(SnackBar(content: Text(formatDioError(e)))),
-        data: (user) {
-          if (user == null || !context.mounted) return;
-          // Backup navigation if GoRouter redirect did not fire in the same frame.
-          WidgetsBinding.instance.addPostFrameCallback((_) {
-            if (!context.mounted) return;
-            context.go(user.needsOnboarding ? '/day0' : '/now');
-          });
-        },
-      );
-    });
 
     return Scaffold(
       appBar: AppBar(title: const Text('Sign in')),
@@ -130,10 +129,12 @@ class _LoginPageState extends ConsumerState<LoginPage> {
                         ? null
                         : () async {
                             try {
-                              final account = await _googleSignIn.signIn();
+                              final g = ref.read(googleSignInProvider);
+                              final account = await g.signIn();
                               if (account == null) return;
                               final auth = await account.authentication;
                               final idToken = auth.idToken;
+                              final accessToken = auth.accessToken;
                               if (idToken == null || idToken.trim().isEmpty) {
                                 throw StateError(
                                   'Google did not return an ID token. '
@@ -142,7 +143,10 @@ class _LoginPageState extends ConsumerState<LoginPage> {
                               }
                               await ref
                                   .read(sessionProvider.notifier)
-                                  .loginWithGoogleIdToken(idToken);
+                                  .loginWithGoogle(
+                                    idToken: idToken,
+                                    accessToken: accessToken,
+                                  );
                             } catch (e) {
                               if (!context.mounted) return;
                               debugPrint('Google sign-in failed: $e');

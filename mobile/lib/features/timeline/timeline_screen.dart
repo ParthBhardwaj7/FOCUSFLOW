@@ -71,6 +71,16 @@ class _TimelineScreenState extends ConsumerState<TimelineScreen>
   void initState() {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      final today = todayLocalYmdString();
+      final current = ref.read(timelineDayOnProvider);
+      if (current != today) {
+        ref.read(timelineDayOnProvider.notifier).selectDay(today);
+        ref.invalidate(timelineSlotsProvider);
+        ref.invalidate(dayStripSummariesProvider);
+      }
+    });
     _tick = Timer.periodic(const Duration(seconds: 60), (_) {
       if (!mounted) return;
       final shellTab = ShellTabIndexScope.maybeOf(context);
