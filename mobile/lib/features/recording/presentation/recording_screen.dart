@@ -5,6 +5,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../../core/providers.dart';
+import '../../../core/user_facing_errors.dart';
 import '../../inbox/inbox_providers.dart';
 import '../domain/recording_model.dart';
 import '../domain/recording_state.dart';
@@ -112,7 +113,7 @@ class _RecordingScreenState extends ConsumerState<RecordingScreen> {
                 child: CircularProgressIndicator(),
               ),
             ),
-            error: (e, _) => Text('$e'),
+            error: (e, _) => Text(userFacingError(e)),
             data: (items) {
               if (items.isEmpty) {
                 return Text(

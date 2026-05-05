@@ -1,9 +1,12 @@
+import 'dart:async';
+
 import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_markdown/flutter_markdown.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
+import '../../core/ai_chat_history_prefs.dart';
 import '../../core/models/productivity_day_model.dart';
 import '../../core/models/timeline_slot_model.dart';
 import '../../core/models/user_model.dart';
@@ -94,6 +97,178 @@ class _AiPageState extends ConsumerState<AiPage> {
   final _turns = <_ChatTurn>[];
   var _busy = false;
   String? _error;
+  /// When false, chat bubbles are collapsed to a single row (faster scroll to insights).
+  var _chatPanelExpanded = true;
+  var _historyHydrated = false;
+
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      unawaited(_hydrateChatHistory());
+    });
+  }
+
+  Future<void> _hydrateChatHistory() async {
+    final list = await loadAiChatHistory();
+    if (!mounted || _historyHydrated) return;
+    _historyHydrated = true;
+    if (_turns.isNotEmpty) return;
+    if (list.isEmpty) return;
+    setState(() {
+      _turns.addAll(
+        list.map((r) => _ChatTurn(isUser: r.isUser, text: r.text)),
+      );
+      _chatPanelExpanded = true;
+    });
+    _scrollChatToEnd();
+  }
+
+  Future<void> _persistChat() async {
+    final records = <AiChatTurnRecord>[
+      for (final t in _turns) AiChatTurnRecord(isUser: t.isUser, text: t.text),
+    ];
+    await saveAiChatHistory(records);
+  }
+
+  Future<void> _confirmClearChat() async {
+    if (_turns.isEmpty) return;
+    final ok = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Clear chat?'),
+        content: const Text(
+          'Remove all coach messages from this device? This cannot be undone.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: const Text('Cancel'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.pop(ctx, true),
+            child: const Text('Clear'),
+          ),
+        ],
+      ),
+    );
+    if (ok != true || !mounted) return;
+    await clearAiChatHistory();
+    setState(() => _turns.clear());
+  }
+
+  void _showChatHistorySheet() {
+    if (_turns.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('No messages yet.')),
+      );
+      return;
+    }
+    final scheme = Theme.of(context).colorScheme;
+    showModalBottomSheet<void>(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: scheme.surface,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (ctx) {
+        final bottom = MediaQuery.paddingOf(ctx).bottom;
+        return DraggableScrollableSheet(
+          minChildSize: 0.35,
+          maxChildSize: 0.92,
+          expand: false,
+          builder: (ctx, scrollCtrl) {
+            return Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(16, 12, 8, 8),
+                  child: Row(
+                    children: [
+                      Expanded(
+                        child: Text(
+                          'Chat history',
+                          style: TextStyle(
+                            color: scheme.onSurface,
+                            fontWeight: FontWeight.w800,
+                            fontSize: 18,
+                          ),
+                        ),
+                      ),
+                      IconButton(
+                        tooltip: 'Close',
+                        onPressed: () => Navigator.pop(ctx),
+                        icon: const Icon(Icons.close_rounded),
+                      ),
+                    ],
+                  ),
+                ),
+                Expanded(
+                  child: ListView.builder(
+                    controller: scrollCtrl,
+                    padding: EdgeInsets.fromLTRB(16, 0, 16, 16 + bottom),
+                    itemCount: _turns.length,
+                    itemBuilder: (c, i) {
+                      final t = _turns[i];
+                      if (t.isUser) {
+                        return Padding(
+                          padding: const EdgeInsets.only(bottom: 12),
+                          child: Align(
+                            alignment: Alignment.centerRight,
+                            child: Container(
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 12,
+                                vertical: 8,
+                              ),
+                              decoration: BoxDecoration(
+                                color: scheme.primary.withValues(alpha: 0.9),
+                                borderRadius: BorderRadius.circular(12),
+                              ),
+                              child: Text(
+                                t.text,
+                                style: TextStyle(
+                                  color: scheme.onPrimary,
+                                  fontSize: 14,
+                                ),
+                              ),
+                            ),
+                          ),
+                        );
+                      }
+                      return Padding(
+                        padding: const EdgeInsets.only(bottom: 14),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              _kCoachName,
+                              style: TextStyle(
+                                fontSize: 10,
+                                fontWeight: FontWeight.w700,
+                                color: scheme.onSurfaceVariant,
+                              ),
+                            ),
+                            const SizedBox(height: 4),
+                            MarkdownBody(
+                              data: t.text,
+                              shrinkWrap: true,
+                              selectable: true,
+                              styleSheet: _coachMarkdownStyle(c),
+                            ),
+                          ],
+                        ),
+                      );
+                    },
+                  ),
+                ),
+              ],
+            );
+          },
+        );
+      },
+    );
+  }
 
   @override
   void dispose() {
@@ -135,6 +310,7 @@ class _AiPageState extends ConsumerState<AiPage> {
         _busy = false;
       });
       _scrollChatToEnd();
+      unawaited(_persistChat());
     } on DioException catch (e) {
       if (!mounted) return;
       setState(() {
@@ -316,6 +492,19 @@ class _AiPageState extends ConsumerState<AiPage> {
         backgroundColor: TimelineTokens.scaffoldBg(context),
         surfaceTintColor: Colors.transparent,
         title: const Text('AI Coach'),
+        actions: [
+          IconButton(
+            tooltip: 'Chat history',
+            onPressed: _showChatHistorySheet,
+            icon: const Icon(Icons.history_rounded),
+          ),
+          if (_turns.isNotEmpty)
+            IconButton(
+              tooltip: 'Clear chat',
+              onPressed: _busy ? null : _confirmClearChat,
+              icon: const Icon(Icons.delete_outline_rounded),
+            ),
+        ],
         bottom: PreferredSize(
           preferredSize: const Size.fromHeight(22),
           child: Padding(
@@ -536,7 +725,73 @@ class _AiPageState extends ConsumerState<AiPage> {
               ),
             ),
           ),
-          if (_turns.isNotEmpty) ...[
+          if (_turns.isNotEmpty && !_chatPanelExpanded) ...[
+            Padding(
+              padding: const EdgeInsets.fromLTRB(12, 0, 12, 8),
+              child: _SectionLabel(text: 'Chat with your coach'),
+            ),
+            Padding(
+              padding: const EdgeInsets.fromLTRB(12, 0, 12, 8),
+              child: Material(
+                color: scheme.surfaceContainerHighest,
+                borderRadius: BorderRadius.circular(16),
+                child: InkWell(
+                  borderRadius: BorderRadius.circular(16),
+                  onTap: () => setState(() => _chatPanelExpanded = true),
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 14,
+                      vertical: 12,
+                    ),
+                    child: Row(
+                      children: [
+                        Icon(
+                          Icons.chat_bubble_outline_rounded,
+                          color: scheme.primary,
+                          size: 22,
+                        ),
+                        const SizedBox(width: 10),
+                        Expanded(
+                          child: Text(
+                            'Coach chat · ${_turns.length} messages — tap to expand',
+                            style: TextStyle(
+                              color: scheme.onSurface,
+                              fontWeight: FontWeight.w600,
+                              fontSize: 13,
+                            ),
+                          ),
+                        ),
+                        Icon(
+                          Icons.open_in_full_rounded,
+                          size: 20,
+                          color: scheme.onSurfaceVariant,
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              ),
+            ),
+            Padding(
+              padding: const EdgeInsets.fromLTRB(12, 0, 12, 8),
+              child: DecoratedBox(
+                decoration: BoxDecoration(
+                  color: scheme.surface,
+                  borderRadius: BorderRadius.circular(18),
+                  border: Border.all(
+                    color: scheme.outline.withValues(alpha: 0.35),
+                  ),
+                ),
+                child: ClipRRect(
+                  borderRadius: BorderRadius.circular(18),
+                  child: _coachComposerRow(
+                    topDivider: false,
+                    offline: chatUnavailable,
+                  ),
+                ),
+              ),
+            ),
+          ] else if (_turns.isNotEmpty) ...[
             Padding(
               padding: const EdgeInsets.fromLTRB(12, 0, 12, 8),
               child: _SectionLabel(text: 'Chat with your coach'),
@@ -567,7 +822,7 @@ class _AiPageState extends ConsumerState<AiPage> {
                       children: [
                         Container(
                           width: double.infinity,
-                          padding: const EdgeInsets.fromLTRB(14, 10, 14, 8),
+                          padding: const EdgeInsets.fromLTRB(8, 4, 4, 8),
                           decoration: BoxDecoration(
                             border: Border(
                               bottom: BorderSide(
@@ -575,13 +830,33 @@ class _AiPageState extends ConsumerState<AiPage> {
                               ),
                             ),
                           ),
-                          child: Text(
-                            'Messages stay on this device until sent. When you are online, $_kCoachName can reply in more detail.',
-                            style: TextStyle(
-                              color: scheme.onSurfaceVariant.withValues(alpha: 0.92),
-                              fontSize: 12,
-                              height: 1.35,
-                            ),
+                          child: Row(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Expanded(
+                                child: Padding(
+                                  padding: const EdgeInsets.only(
+                                    left: 6,
+                                    top: 6,
+                                  ),
+                                  child: Text(
+                                    'Messages stay on this device until sent. When you are online, $_kCoachName can reply in more detail.',
+                                    style: TextStyle(
+                                      color: scheme.onSurfaceVariant
+                                          .withValues(alpha: 0.92),
+                                      fontSize: 12,
+                                      height: 1.35,
+                                    ),
+                                  ),
+                                ),
+                              ),
+                              IconButton(
+                                tooltip: 'Minimize chat',
+                                onPressed: () =>
+                                    setState(() => _chatPanelExpanded = false),
+                                icon: const Icon(Icons.expand_more_rounded),
+                              ),
+                            ],
                           ),
                         ),
                         Expanded(

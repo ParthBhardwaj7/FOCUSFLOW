@@ -56,7 +56,7 @@ class _LoginPageState extends ConsumerState<LoginPage> {
   String _googleErrorMessage(Object error) {
     final raw = error.toString();
     if (raw.contains('id token') || raw.contains('ID token')) {
-      return 'Google sign-in is not configured. Check GOOGLE_WEB_CLIENT_ID.';
+      return 'Google sign-in is unavailable right now. Please try again shortly.';
     }
     if (raw.contains('network') || raw.contains('connection')) {
       return 'Network issue. Please check your internet and try again.';
@@ -137,8 +137,7 @@ class _LoginPageState extends ConsumerState<LoginPage> {
                               final accessToken = auth.accessToken;
                               if (idToken == null || idToken.trim().isEmpty) {
                                 throw StateError(
-                                  'Google did not return an ID token. '
-                                  'Set GOOGLE_WEB_CLIENT_ID in mobile/.env to your Firebase Web client ID.',
+                                  'Google did not return an ID token.',
                                 );
                               }
                               await ref

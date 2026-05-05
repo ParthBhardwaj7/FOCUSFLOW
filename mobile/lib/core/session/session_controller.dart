@@ -1,7 +1,6 @@
 import 'dart:async';
 
 import 'package:dio/dio.dart';
-import 'package:flutter/foundation.dart' show debugPrint;
 import 'package:flutter/scheduler.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
@@ -25,39 +24,27 @@ import 'session_restore_budgets.dart';
 class SessionController extends AsyncNotifier<UserModel?> {
   @override
   Future<UserModel?> build() async {
-    debugPrint('[DEBUG] SessionController.build() starting');
-    final sw = Stopwatch()..start();
-    
     if (kDevAuthBypass) {
-      debugPrint('[DEBUG] Dev auth bypass enabled');
       final u = devBypassUser();
       notifyGoRouterAuthChanged(ref);
-      debugPrint('[DEBUG] SessionController returning dev user: ${sw.elapsedMilliseconds}ms');
       return u;
     }
-    
-    debugPrint('[DEBUG] About to get FocusFlowClient');
+
     final c = ref.read(focusFlowClientProvider);
-    debugPrint('[DEBUG] FocusFlowClient obtained: ${sw.elapsedMilliseconds}ms');
-    
+
     // Hard cap: OEM / secure-storage bugs can otherwise hang splash forever.
-    debugPrint('[DEBUG] About to call tryRestoreSession');
     final user = await c.tryRestoreSession().timeout(
       kSessionRestoreTimeout,
       onTimeout: () {
-        debugPrint('[DEBUG] tryRestoreSession TIMED OUT after ${kSessionRestoreTimeout.inSeconds}s');
         return null;
       },
     );
-    debugPrint('[DEBUG] tryRestoreSession completed, user=${user != null ? "found" : "null"}: ${sw.elapsedMilliseconds}ms');
-    
+
     notifyGoRouterAuthChanged(ref);
-    debugPrint('[DEBUG] notifyGoRouterAuthChanged done: ${sw.elapsedMilliseconds}ms');
-    
+
     // Never start network work on the same stack as session restore — let the
     // router paint /now (or login) first, then run sync in the background.
     SchedulerBinding.instance.addPostFrameCallback((_) {
-      debugPrint('[DEBUG] SessionController postFrameCallback starting');
       if (!ref.mounted) return;
       final client = ref.read(focusFlowClientProvider);
       if (user != null) {
@@ -75,10 +62,8 @@ class SessionController extends AsyncNotifier<UserModel?> {
       } else {
         unawaited(syncRuntimeRemote(client, signedIn: false));
       }
-      debugPrint('[DEBUG] SessionController postFrameCallback done');
     });
-    
-    debugPrint('[DEBUG] SessionController.build() returning: ${sw.elapsedMilliseconds}ms');
+
     return user;
   }
 

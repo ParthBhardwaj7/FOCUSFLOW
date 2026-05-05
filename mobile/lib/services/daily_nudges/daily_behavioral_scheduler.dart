@@ -26,6 +26,7 @@ abstract final class DailyBehavioralScheduler {
       return;
     }
     if (!await NotificationBootstrap.notificationsEnabled()) {
+      await cancelAllScheduled();
       return;
     }
 

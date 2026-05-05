@@ -66,11 +66,32 @@ class _TimelineScreenState extends ConsumerState<TimelineScreen>
   Timer? _tick;
   final ScrollController _pageScroll = ScrollController();
   var _reorderSheetOpening = false;
+  ProviderSubscription<bool>? _reorderModeSub;
 
   @override
   void initState() {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
+    _reorderModeSub = ref.listenManual<bool>(timelineReorderModeProvider, (
+      prev,
+      next,
+    ) {
+      if (next != true || _reorderSheetOpening) return;
+      _reorderSheetOpening = true;
+      WidgetsBinding.instance.addPostFrameCallback((_) async {
+        try {
+          if (!context.mounted) return;
+          ref.read(timelineReorderModeProvider.notifier).exit();
+          await showTimelineReorderSheet(context, ref);
+        } finally {
+          if (mounted) {
+            setState(() => _reorderSheetOpening = false);
+          } else {
+            _reorderSheetOpening = false;
+          }
+        }
+      });
+    });
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted) return;
       final today = todayLocalYmdString();
@@ -100,6 +121,7 @@ class _TimelineScreenState extends ConsumerState<TimelineScreen>
   void dispose() {
     WidgetsBinding.instance.removeObserver(this);
     _tick?.cancel();
+    _reorderModeSub?.close();
     _pageScroll.dispose();
     super.dispose();
   }
@@ -120,41 +142,15 @@ class _TimelineScreenState extends ConsumerState<TimelineScreen>
 
   @override
   Widget build(BuildContext context) {
-    debugPrint('[DEBUG] TimelineScreen.build starting');
-    final sw = Stopwatch()..start();
-    
-    ref.listen<bool>(timelineReorderModeProvider, (prev, next) {
-      if (next != true || _reorderSheetOpening) return;
-      _reorderSheetOpening = true;
-      WidgetsBinding.instance.addPostFrameCallback((_) async {
-        try {
-          if (!context.mounted) return;
-          ref.read(timelineReorderModeProvider.notifier).exit();
-          await showTimelineReorderSheet(context, ref);
-        } finally {
-          if (mounted) {
-            setState(() => _reorderSheetOpening = false);
-          } else {
-            _reorderSheetOpening = false;
-          }
-        }
-      });
-    });
-    
     final dayOn = ref.watch(timelineDayOnProvider);
-    debugPrint('[DEBUG] timelineDayOnProvider: ${sw.elapsedMilliseconds}ms');
-    
     final shellTab = ShellTabIndexScope.maybeOf(context);
     final timelineActive = shellTab == null || shellTab == kShellTabTimeline;
-    debugPrint('[DEBUG] timelineActive=$timelineActive: ${sw.elapsedMilliseconds}ms');
 
     // IndexedStack keeps this route mounted off-tab; avoid watching local DB
     // providers (and the week strip's summaries) unless Timeline is visible.
-    debugPrint('[DEBUG] About to watch timelineSlotsProvider');
     final slotsAsync = timelineActive
         ? ref.watch(timelineSlotsProvider)
         : const AsyncValue<List<TimelineSlotModel>>.data(<TimelineSlotModel>[]);
-    debugPrint('[DEBUG] timelineSlotsProvider state: loading=${slotsAsync.isLoading}, hasValue=${slotsAsync.hasValue}, hasError=${slotsAsync.hasError}: ${sw.elapsedMilliseconds}ms');
 
     return TickerMode(
       enabled: timelineActive,
@@ -163,8 +159,27 @@ class _TimelineScreenState extends ConsumerState<TimelineScreen>
         body: SafeArea(
           child: timelineActive
               ? slotsAsync.when(
-                  loading: () =>
-                      const Center(child: CircularProgressIndicator()),
+                  loading: () => Center(
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        CircularProgressIndicator(
+                          color: Theme.of(context).colorScheme.primary,
+                        ),
+                        const SizedBox(height: 16),
+                        Text(
+                          'Loading your day…',
+                          style: TextStyle(
+                            color: TimelineTokens.adaptiveSecondaryText(
+                              context,
+                            ),
+                            fontSize: 14,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
                   error: (e, _) => Center(
                     child: Text(
                       userFacingError(e),

@@ -179,7 +179,7 @@ class _DeepFocusPrepBodyState extends ConsumerState<_DeepFocusPrepBody> {
               child: Center(child: CircularProgressIndicator()),
             ),
             error: (e, _) => Text(
-              'No audio tracks found. Add mp3/m4a files to assets/deep_focus_audio/ and rebuild.',
+              'No focus sounds are available right now. You can still start deep focus without sound.',
               style: TextStyle(
                 color: cs.onSurfaceVariant.withValues(alpha: 0.9),
                 fontSize: 13,
@@ -189,7 +189,7 @@ class _DeepFocusPrepBodyState extends ConsumerState<_DeepFocusPrepBody> {
             data: (tracks) {
               if (tracks.isEmpty) {
                 return Text(
-                  'Add audio files to assets/deep_focus_audio/ in the project, then rebuild the app.',
+                  'Focus sounds are unavailable on this build. You can continue without sound.',
                   style: TextStyle(
                     color: cs.onSurfaceVariant.withValues(alpha: 0.95),
                     fontSize: 13,

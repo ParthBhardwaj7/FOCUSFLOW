@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../core/coach_profile_sync.dart';
@@ -35,8 +36,10 @@ class _ProfileDemographicsSectionState
     if (_age.text.trim().isNotEmpty && parsedAge == null) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Enter a valid age (1–120) or leave blank.'),
+        SnackBar(
+          content: Text(
+            'Enter a valid age ($kProfileMinAgeYears–$kProfileMaxAgeYears) or leave blank.',
+          ),
         ),
       );
       return;
@@ -165,6 +168,10 @@ class _ProfileDemographicsSectionState
                           child: TextField(
                             controller: _age,
                             keyboardType: TextInputType.number,
+                            inputFormatters: [
+                              FilteringTextInputFormatter.digitsOnly,
+                              LengthLimitingTextInputFormatter(3),
+                            ],
                             style: TextStyle(color: on, fontSize: 16),
                             cursorColor: cs.primary,
                             decoration: InputDecoration(

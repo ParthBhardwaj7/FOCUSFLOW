@@ -48,7 +48,11 @@ class _SpeechToTextMicButtonState extends State<SpeechToTextMicButton> {
         setState(() => _listening = false);
         ScaffoldMessenger.of(
           context,
-        ).showSnackBar(SnackBar(content: Text('Voice input: ${e.errorMsg}')));
+        ).showSnackBar(
+          const SnackBar(
+            content: Text('Voice input is unavailable right now. Please try again.'),
+          ),
+        );
       },
     );
     if (mounted && ok) setState(() => _ready = true);

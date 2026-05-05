@@ -35,20 +35,14 @@ String? splashDestinationForSession(AsyncValue<UserModel?> async) {
 }
 
 final goRouterProvider = Provider<GoRouter>((ref) {
-  debugPrint('[DEBUG] goRouterProvider building');
   final refresh = ref.watch(goRouterRefreshProvider);
-  debugPrint('[DEBUG] goRouterRefreshProvider loaded');
 
   final router = GoRouter(
     refreshListenable: refresh,
     initialLocation: kDevAuthBypass ? '/now' : '/splash',
     redirect: (context, state) {
-      debugPrint('[DEBUG] GoRouter redirect: ${state.matchedLocation}');
       final loc = state.matchedLocation;
       final async = ref.read(sessionProvider);
-      debugPrint(
-        '[DEBUG] sessionProvider state: loading=${async.isLoading}, hasValue=${async.hasValue}, hasError=${async.hasError}',
-      );
 
       if (loc == '/focus' ||
           loc == '/deep-focus' ||
@@ -59,7 +53,6 @@ final goRouterProvider = Provider<GoRouter>((ref) {
       }
 
       if (kDevAuthBypass) {
-        debugPrint('[DEBUG] Dev auth bypass enabled, redirecting to /now');
         if (loc == '/splash' || loc.startsWith('/auth') || loc == '/day0') {
           return '/now';
         }
@@ -131,9 +124,12 @@ final goRouterProvider = Provider<GoRouter>((ref) {
             NoteEditorPage(noteId: state.pathParameters['noteId']!),
       ),
       StatefulShellRoute.indexedStack(
-        builder: (context, state, navigationShell) {
-          return TimelineNotificationSyncHost(
-            child: MainShellScaffold(navigationShell: navigationShell),
+        pageBuilder: (context, state, navigationShell) {
+          return NoTransitionPage(
+            key: state.pageKey,
+            child: TimelineNotificationSyncHost(
+              child: MainShellScaffold(navigationShell: navigationShell),
+            ),
           );
         },
         branches: [

@@ -33,7 +33,9 @@ abstract final class TimelineNotificationScheduler {
       await cancelAllManaged();
       return;
     }
+    // Permission denied / revoked — clear pending schedules so we do not think tasks are armed.
     if (!await NotificationBootstrap.notificationsEnabled()) {
+      await cancelAllManaged();
       return;
     }
     await _syncStore(store, touchedDayOns: touchedDayOns);

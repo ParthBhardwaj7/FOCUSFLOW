@@ -1,7 +1,6 @@
 import 'dart:async';
 import 'dart:math' as math;
 
-import 'package:flutter/foundation.dart' show debugPrint;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../core/day_local.dart';
@@ -254,36 +253,18 @@ class TimelineSlotsNotifier extends AsyncNotifier<List<TimelineSlotModel>> {
 
   @override
   Future<List<TimelineSlotModel>> build() async {
-    debugPrint('[DEBUG] timelineSlotsProvider.build() starting');
-    final sw = Stopwatch()..start();
-
     final dayOn = ref.watch(timelineDayOnProvider);
-    debugPrint(
-      '[DEBUG] timelineDayOnProvider in slots provider: ${sw.elapsedMilliseconds}ms',
-    );
-
     if (kDevAuthBypass) {
-      debugPrint('[DEBUG] Using dev demo slots');
       return devDemoTimelineSlots(dayOn);
     }
-
-    debugPrint('[DEBUG] About to await timelineLocalStoreProvider.future');
     final store = await ref.watch(timelineLocalStoreProvider.future);
-    debugPrint(
-      '[DEBUG] timelineLocalStoreProvider.future completed: ${sw.elapsedMilliseconds}ms',
-    );
 
     try {
-      debugPrint('[DEBUG] About to readSlotsForDay');
       final slots = await store
           .readSlotsForDay(dayOn)
           .timeout(_kReadDayBudget, onTimeout: () => const []);
-      debugPrint(
-        '[DEBUG] readSlotsForDay completed, returning ${slots.length} slots: ${sw.elapsedMilliseconds}ms',
-      );
       return slots;
-    } catch (e) {
-      debugPrint('[DEBUG] readSlotsForDay error: $e');
+    } catch (_) {
       return const [];
     }
   }

@@ -7,6 +7,10 @@ const _kGender = 'focusflow_demographics_gender';
 
 const int kMaxDisplayNameLength = 80;
 
+/// Valid age range for profile (inclusive). Stored values outside range are ignored.
+const int kProfileMinAgeYears = 1;
+const int kProfileMaxAgeYears = 100;
+
 /// Values for the gender dropdown (first is unset).
 const List<String> kGenderChoices = [
   '',
@@ -43,7 +47,9 @@ Future<ProfileDemographics> loadProfileDemographics() async {
   final p = await SharedPreferences.getInstance();
   final rawAge = p.getInt(_kAgeYears);
   int? age;
-  if (rawAge != null && rawAge >= 1 && rawAge <= 120) {
+  if (rawAge != null &&
+      rawAge >= kProfileMinAgeYears &&
+      rawAge <= kProfileMaxAgeYears) {
     age = rawAge;
   }
   final g = p.getString(_kGender) ?? '';
@@ -64,7 +70,9 @@ Future<void> saveProfileDemographics(ProfileDemographics d) async {
         ? name.substring(0, kMaxDisplayNameLength)
         : name,
   );
-  if (d.ageYears != null && d.ageYears! >= 1 && d.ageYears! <= 120) {
+  if (d.ageYears != null &&
+      d.ageYears! >= kProfileMinAgeYears &&
+      d.ageYears! <= kProfileMaxAgeYears) {
     await p.setInt(_kAgeYears, d.ageYears!);
   } else {
     await p.remove(_kAgeYears);
@@ -91,12 +99,14 @@ Future<void> appendDemographicsToAiSummary(StringBuffer buf) async {
 }
 
 /// Parse age from a text field; returns null if empty or invalid.
+/// Rejects negative, zero, and values over [kProfileMaxAgeYears] (no silent clamping).
 int? parseAgeYears(String text) {
   final t = text.trim();
   if (t.isEmpty) return null;
   final n = int.tryParse(t);
   if (n == null) return null;
-  return n.clamp(1, 120);
+  if (n < kProfileMinAgeYears || n > kProfileMaxAgeYears) return null;
+  return n;
 }
 
 String clipDisplayName(String s) {
