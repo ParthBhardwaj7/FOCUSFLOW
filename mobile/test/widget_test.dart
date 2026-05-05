@@ -1,3 +1,4 @@
+import 'package:connectivity_plus/connectivity_plus.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -7,13 +8,62 @@ import 'package:focusflow_mobile/core/day_local.dart';
 import 'package:focusflow_mobile/core/focus_prefs.dart';
 import 'package:focusflow_mobile/core/models/productivity_day_model.dart';
 import 'package:focusflow_mobile/core/models/timeline_slot_model.dart';
+import 'package:focusflow_mobile/core/models/user_model.dart';
+import 'package:focusflow_mobile/features/inbox/inbox_providers.dart';
 import 'package:focusflow_mobile/features/settings/settings_providers.dart';
 import 'package:focusflow_mobile/features/timeline/timeline_providers.dart';
 import 'package:focusflow_mobile/features/timeline/timeline_screen.dart';
+import 'package:focusflow_mobile/router.dart';
 
 void main() {
+  test('splashDestinationForSession resolves auth targets', () {
+    expect(
+      splashDestinationForSession(const AsyncValue<UserModel?>.loading()),
+      isNull,
+    );
+    expect(
+      splashDestinationForSession(const AsyncValue<UserModel?>.data(null)),
+      '/auth/login',
+    );
+    expect(
+      splashDestinationForSession(
+        AsyncValue.data(
+          const UserModel(id: 'u-1', email: 'demo@focusflow.app'),
+        ),
+      ),
+      '/day0',
+    );
+    expect(
+      splashDestinationForSession(
+        AsyncValue.data(
+          UserModel(
+            id: 'u-2',
+            email: 'done@focusflow.app',
+            onboardingCompletedAt: DateTime.utc(2026, 5, 5),
+          ),
+        ),
+      ),
+      '/now',
+    );
+    expect(
+      splashDestinationForSession(
+        AsyncValue<UserModel?>.error(Exception('boom'), StackTrace.empty),
+      ),
+      '/auth/login',
+    );
+  });
+
   testWidgets('FocusFlowApp builds', (WidgetTester tester) async {
-    await tester.pumpWidget(const ProviderScope(child: FocusFlowApp()));
+    await tester.pumpWidget(
+      ProviderScope(
+        overrides: [
+          connectivityProvider.overrideWith(
+            (ref) => Stream.value(const [ConnectivityResult.none]),
+          ),
+        ],
+        child: const FocusFlowApp(),
+      ),
+    );
     await tester.pump();
     expect(find.byType(FocusFlowApp), findsOneWidget);
   });
@@ -114,6 +164,6 @@ class _TestDayStripSummaries extends DayStripSummariesNotifier {
 
   @override
   Future<Map<String, DayStripSummary>> build() async => {
-        _dayOn: DayStripSummary.fromSlots(_dayOn, _slots),
-      };
+    _dayOn: DayStripSummary.fromSlots(_dayOn, _slots),
+  };
 }

@@ -8,8 +8,10 @@ import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
 import { useState } from 'react';
 import { toast } from 'sonner';
+import { useTheme } from 'next-themes';
 
 export default function SettingsPage() {
+  const { theme, setTheme, resolvedTheme } = useTheme();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [slack, setSlack] = useState('');
@@ -61,6 +63,34 @@ export default function SettingsPage() {
         </p>
       </div>
 
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-base">Appearance</CardTitle>
+        </CardHeader>
+        <CardContent className="flex flex-wrap gap-2">
+          <Button
+            variant={theme === 'light' ? 'default' : 'secondary'}
+            onClick={() => setTheme('light')}
+          >
+            Light
+          </Button>
+          <Button
+            variant={theme === 'dark' ? 'default' : 'secondary'}
+            onClick={() => setTheme('dark')}
+          >
+            Dark
+          </Button>
+          <Button
+            variant={theme === 'system' ? 'default' : 'secondary'}
+            onClick={() => setTheme('system')}
+          >
+            System
+          </Button>
+          <p className="w-full text-xs text-muted-foreground">
+            Current mode: {theme === 'system' ? `system (${resolvedTheme ?? 'dark'})` : theme}
+          </p>
+        </CardContent>
+      </Card>
       <Card>
         <CardHeader>
           <CardTitle className="text-base">API integration status</CardTitle>

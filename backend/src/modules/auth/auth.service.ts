@@ -8,6 +8,7 @@ import { JwtService } from '@nestjs/jwt';
 import type { SignOptions } from 'jsonwebtoken';
 import * as argon2 from 'argon2';
 import { randomBytes } from 'node:crypto';
+import { OAuth2Client } from 'google-auth-library';
 import { RefreshTokenScope } from '@prisma/client';
 import { PrismaService } from '../../prisma/prisma.service';
 import { expiryToMs } from '../../common/utils/expiry-ms';
@@ -22,6 +23,8 @@ function isSuspended(user: { isBanned: boolean; banExpiresAt: Date | null }) {
 
 @Injectable()
 export class AuthService {
+  private readonly googleOAuth = new OAuth2Client();
+
   constructor(
     private readonly prisma: PrismaService,
     private readonly jwt: JwtService,
@@ -58,6 +61,53 @@ export class AuthService {
     if (!ok) {
       throw new UnauthorizedException('Invalid credentials');
     }
+    return this.issueFreshSession(user.id, user.email);
+  }
+
+  async loginWithGoogleIdToken(idToken: string) {
+    const audience = this.config
+      .getOrThrow<string>('GOOGLE_AUTH_CLIENT_IDS')
+      .split(',')
+      .map((v) => v.trim())
+      .filter((v) => v.length > 0);
+    if (audience.length === 0) {
+      throw new UnauthorizedException('Google auth is not configured');
+    }
+
+    let payload:
+      | {
+          email?: string;
+          email_verified?: boolean;
+        }
+      | undefined;
+    try {
+      const ticket = await this.googleOAuth.verifyIdToken({ idToken, audience });
+      payload = ticket.getPayload();
+    } catch {
+      throw new UnauthorizedException('Invalid Google ID token');
+    }
+    const email = payload?.email?.trim().toLowerCase();
+    const emailVerified = payload?.email_verified === true;
+    if (!email || !emailVerified) {
+      throw new UnauthorizedException('Google account email not verified');
+    }
+
+    const existing = await this.prisma.user.findUnique({ where: { email } });
+    if (existing) {
+      if (isSuspended(existing)) {
+        throw new UnauthorizedException('Account suspended');
+      }
+      return this.issueFreshSession(existing.id, existing.email);
+    }
+
+    const passwordHash = await argon2.hash(randomBytes(24).toString('base64url'));
+    const user = await this.prisma.user.create({
+      data: {
+        email,
+        emailVerifiedAt: new Date(),
+        passwordHash,
+      },
+    });
     return this.issueFreshSession(user.id, user.email);
   }
 

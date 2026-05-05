@@ -397,6 +397,17 @@ class FocusFlowClient {
     return user;
   }
 
+  Future<UserModel> loginWithGoogleIdToken(String idToken) async {
+    final res = await _plain.post<Map<String, dynamic>>(
+      '/v1/auth/google',
+      data: {'idToken': idToken},
+    );
+    await _persistTokens(res.data!);
+    final user = UserModel.fromJson(res.data!['user'] as Map<String, dynamic>);
+    await _persistUserCache(user);
+    return user;
+  }
+
   Future<void> logout() async {
     final r = await _storage.read(key: _kRefresh);
     if (r != null) {

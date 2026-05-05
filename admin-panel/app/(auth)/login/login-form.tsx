@@ -15,6 +15,11 @@ export function LoginForm() {
   const [password, setPassword] = useState('');
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
+  const [googleLoading, setGoogleLoading] = useState(false);
+  const forgotPasswordUrl =
+    process.env.NEXT_PUBLIC_FORGOT_PASSWORD_URL?.trim() || 'mailto:support@focusflow.app';
+  const showGoogleSignIn =
+    process.env.NEXT_PUBLIC_ENABLE_GOOGLE_SIGN_IN?.toLowerCase() === 'true';
 
   async function onSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -35,6 +40,14 @@ export function LoginForm() {
     router.refresh();
   }
 
+  async function onGoogleSignIn() {
+    setGoogleLoading(true);
+    setError(null);
+    const next = search?.get('callbackUrl') ?? '/';
+    await signIn('google', { callbackUrl: next });
+    setGoogleLoading(false);
+  }
+
   return (
     <div className="relative flex min-h-screen items-center justify-center overflow-hidden bg-background p-4">
       <div
@@ -47,12 +60,12 @@ export function LoginForm() {
       />
       <Card className="relative z-10 w-full max-w-md border-border/60 bg-card/90 shadow-2xl shadow-violet-950/20 backdrop-blur-md">
         <CardHeader className="space-y-3 pb-2">
-          <div className="flex size-11 items-center justify-center rounded-xl bg-gradient-to-br from-violet-500 to-fuchsia-600 text-white shadow-lg shadow-violet-500/25">
+          <div className="mx-auto flex size-11 items-center justify-center rounded-xl bg-gradient-to-br from-violet-500 to-fuchsia-600 text-white shadow-lg shadow-violet-500/25">
             <span className="text-lg font-black">FF</span>
           </div>
-          <div>
+          <div className="text-center">
             <CardTitle className="text-2xl font-bold tracking-tight">FocusFlow Admin</CardTitle>
-            <CardDescription className="text-base">
+            <CardDescription className="mx-auto mt-1 max-w-xs text-base">
               Sign in with a SUPERADMIN or ADMIN account.
             </CardDescription>
           </div>
@@ -86,6 +99,35 @@ export function LoginForm() {
             <Button type="submit" className="w-full" disabled={loading}>
               {loading ? 'Signing in…' : 'Sign in'}
             </Button>
+            <div className="text-center">
+              <a
+                href={forgotPasswordUrl}
+                className="text-sm text-violet-600 underline-offset-2 hover:underline dark:text-violet-300"
+              >
+                Forgot password?
+              </a>
+            </div>
+            {showGoogleSignIn ? (
+              <>
+                <div className="relative">
+                  <div className="absolute inset-0 flex items-center">
+                    <span className="w-full border-t border-border" />
+                  </div>
+                  <div className="relative flex justify-center text-xs uppercase">
+                    <span className="bg-card px-2 text-muted-foreground">Or continue with</span>
+                  </div>
+                </div>
+                <Button
+                  type="button"
+                  variant="outline"
+                  className="w-full"
+                  onClick={onGoogleSignIn}
+                  disabled={googleLoading}
+                >
+                  {googleLoading ? 'Redirecting…' : 'Sign in with Google'}
+                </Button>
+              </>
+            ) : null}
           </form>
         </CardContent>
       </Card>

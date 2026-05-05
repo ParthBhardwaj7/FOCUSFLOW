@@ -130,7 +130,7 @@ class SessionController extends AsyncNotifier<UserModel?> {
     });
     if (ref.mounted) {
       notifyGoRouterAuthChanged(ref);
-      scheduleUrgentPlannerPullIfSignedIn(ref, ref.read(sessionProvider).asData?.value);
+      scheduleUrgentPlannerPullIfSignedIn(ref, state.asData?.value);
     }
   }
 
@@ -145,7 +145,22 @@ class SessionController extends AsyncNotifier<UserModel?> {
     });
     if (ref.mounted) {
       notifyGoRouterAuthChanged(ref);
-      scheduleUrgentPlannerPullIfSignedIn(ref, ref.read(sessionProvider).asData?.value);
+      scheduleUrgentPlannerPullIfSignedIn(ref, state.asData?.value);
+    }
+  }
+
+  Future<void> loginWithGoogleIdToken(String idToken) async {
+    state = const AsyncLoading();
+    state = await AsyncValue.guard(() async {
+      final c = ref.read(focusFlowClientProvider);
+      final u = await c.loginWithGoogleIdToken(idToken);
+      markSignedInRemoteBootstrapEnqueued();
+      unawaited(syncRuntimeRemote(c, signedIn: true, forceFlags: true));
+      return u;
+    });
+    if (ref.mounted) {
+      notifyGoRouterAuthChanged(ref);
+      scheduleUrgentPlannerPullIfSignedIn(ref, state.asData?.value);
     }
   }
 
@@ -217,7 +232,7 @@ class SessionController extends AsyncNotifier<UserModel?> {
     );
     if (ref.mounted) {
       notifyGoRouterAuthChanged(ref);
-      scheduleUrgentPlannerPullIfSignedIn(ref, ref.read(sessionProvider).asData?.value);
+      scheduleUrgentPlannerPullIfSignedIn(ref, state.asData?.value);
     }
   }
 

@@ -1,7 +1,7 @@
 import 'dart:async';
 import 'dart:math' as math;
 
-import 'package:flutter/foundation.dart' show debugPrint, kDebugMode;
+import 'package:flutter/foundation.dart' show debugPrint;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../core/day_local.dart';
@@ -61,11 +61,13 @@ class DayStripSummary {
 /// [timelineDayOnProvider] is **not** watched here — watching it re-ran the full
 /// multi-day read on every chip tap and could freeze the UI.
 final dayStripSummariesProvider =
-    AsyncNotifierProvider.autoDispose<DayStripSummariesNotifier, Map<String, DayStripSummary>>(
-      DayStripSummariesNotifier.new,
-    );
+    AsyncNotifierProvider.autoDispose<
+      DayStripSummariesNotifier,
+      Map<String, DayStripSummary>
+    >(DayStripSummariesNotifier.new);
 
-class DayStripSummariesNotifier extends AsyncNotifier<Map<String, DayStripSummary>> {
+class DayStripSummariesNotifier
+    extends AsyncNotifier<Map<String, DayStripSummary>> {
   /// Match max history in [TimelineWeekStripVariantA] (`_weekPageCount`×6 days to oldest chip).
   static const _weekStripPages = 20;
   static const _daysPerStripPage = 6;
@@ -129,30 +131,27 @@ class DayStripSummariesNotifier extends AsyncNotifier<Map<String, DayStripSummar
   Future<Map<String, DayStripSummary>> build() async {
     ref.keepAlive();
 
-    ref.listen<String>(
-      timelineDayOnProvider,
-      (prev, next) {
-        if (prev == next) return;
+    ref.listen<String>(timelineDayOnProvider, (prev, next) {
+      if (prev == next) return;
+      final cur = state.value;
+      if (cur == null) return;
+      unawaited(_patchSelectedDayFromDb(next));
+    });
+
+    ref.listen<AsyncValue<List<TimelineSlotModel>>>(timelineSlotsProvider, (
+      prev,
+      next,
+    ) {
+      next.whenData((slots) {
         final cur = state.value;
         if (cur == null) return;
-        unawaited(_patchSelectedDayFromDb(next));
-      },
-    );
-
-    ref.listen<AsyncValue<List<TimelineSlotModel>>>(
-      timelineSlotsProvider,
-      (prev, next) {
-        next.whenData((slots) {
-          final cur = state.value;
-          if (cur == null) return;
-          final dayOn = ref.read(timelineDayOnProvider);
-          state = AsyncData({
-            ...cur,
-            dayOn: DayStripSummary.fromSlots(dayOn, slots),
-          });
+        final dayOn = ref.read(timelineDayOnProvider);
+        state = AsyncData({
+          ...cur,
+          dayOn: DayStripSummary.fromSlots(dayOn, slots),
         });
-      },
-    );
+      });
+    });
 
     final store = await ref.watch(timelineLocalStoreProvider.future);
     final today = parseLocalYmd(todayLocalYmdString());
@@ -257,25 +256,31 @@ class TimelineSlotsNotifier extends AsyncNotifier<List<TimelineSlotModel>> {
   Future<List<TimelineSlotModel>> build() async {
     debugPrint('[DEBUG] timelineSlotsProvider.build() starting');
     final sw = Stopwatch()..start();
-    
+
     final dayOn = ref.watch(timelineDayOnProvider);
-    debugPrint('[DEBUG] timelineDayOnProvider in slots provider: ${sw.elapsedMilliseconds}ms');
-    
+    debugPrint(
+      '[DEBUG] timelineDayOnProvider in slots provider: ${sw.elapsedMilliseconds}ms',
+    );
+
     if (kDevAuthBypass) {
       debugPrint('[DEBUG] Using dev demo slots');
       return devDemoTimelineSlots(dayOn);
     }
-    
+
     debugPrint('[DEBUG] About to await timelineLocalStoreProvider.future');
     final store = await ref.watch(timelineLocalStoreProvider.future);
-    debugPrint('[DEBUG] timelineLocalStoreProvider.future completed: ${sw.elapsedMilliseconds}ms');
-    
+    debugPrint(
+      '[DEBUG] timelineLocalStoreProvider.future completed: ${sw.elapsedMilliseconds}ms',
+    );
+
     try {
       debugPrint('[DEBUG] About to readSlotsForDay');
       final slots = await store
           .readSlotsForDay(dayOn)
           .timeout(_kReadDayBudget, onTimeout: () => const []);
-      debugPrint('[DEBUG] readSlotsForDay completed, returning ${slots.length} slots: ${sw.elapsedMilliseconds}ms');
+      debugPrint(
+        '[DEBUG] readSlotsForDay completed, returning ${slots.length} slots: ${sw.elapsedMilliseconds}ms',
+      );
       return slots;
     } catch (e) {
       debugPrint('[DEBUG] readSlotsForDay error: $e');

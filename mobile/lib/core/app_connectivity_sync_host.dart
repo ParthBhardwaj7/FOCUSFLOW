@@ -1,7 +1,6 @@
 import 'dart:async';
 
 import 'package:connectivity_plus/connectivity_plus.dart';
-import 'package:flutter/foundation.dart' show debugPrint;
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
@@ -10,7 +9,10 @@ import 'dev_config.dart';
 import 'planner_cloud_sync.dart';
 import 'providers.dart';
 import 'runtime_remote_sync.dart'
-    show syncRuntimeRemote, resetServerUnreachableBackoff, registerServerReachabilityCallbacks;
+    show
+        syncRuntimeRemote,
+        resetServerUnreachableBackoff,
+        registerServerReachabilityCallbacks;
 import 'server_status_provider.dart';
 import 'session/session_controller.dart';
 import 'timeline_local_provider.dart';
@@ -28,7 +30,8 @@ class AppConnectivitySyncHost extends ConsumerStatefulWidget {
       _AppConnectivitySyncHostState();
 }
 
-class _AppConnectivitySyncHostState extends ConsumerState<AppConnectivitySyncHost> {
+class _AppConnectivitySyncHostState
+    extends ConsumerState<AppConnectivitySyncHost> {
   ProviderSubscription<AsyncValue<List<ConnectivityResult>>>? _sub;
   int _lastCatchUpStartedMs = 0;
 
@@ -55,9 +58,13 @@ class _AppConnectivitySyncHostState extends ConsumerState<AppConnectivitySyncHos
     // is not blocked. The providers are non-autoDispose, so once opened they
     // remain cached when Timeline/Inbox tabs render.
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      debugPrint('[DEBUG] AppConnectivitySyncHost postFrameCallback - prewarm starting');
+      debugPrint(
+        '[DEBUG] AppConnectivitySyncHost postFrameCallback - prewarm starting',
+      );
       if (mounted) _prewarmLocalStores();
-      debugPrint('[DEBUG] AppConnectivitySyncHost postFrameCallback - prewarm done');
+      debugPrint(
+        '[DEBUG] AppConnectivitySyncHost postFrameCallback - prewarm done',
+      );
     });
 
     // Only react to genuine offline → online transitions (or true first data).
@@ -81,7 +88,7 @@ class _AppConnectivitySyncHostState extends ConsumerState<AppConnectivitySyncHos
       },
       fireImmediately: false,
     );
-    
+
     debugPrint('[DEBUG] AppConnectivitySyncHost.initState complete');
   }
 

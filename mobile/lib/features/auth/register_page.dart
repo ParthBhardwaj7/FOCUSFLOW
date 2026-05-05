@@ -44,45 +44,69 @@ class _RegisterPageState extends ConsumerState<RegisterPage> {
 
     return Scaffold(
       appBar: AppBar(title: const Text('Create account')),
-      body: ListView(
-        padding: const EdgeInsets.all(24),
-        children: [
-          TextField(
-            controller: _email,
-            keyboardType: TextInputType.emailAddress,
-            decoration: const InputDecoration(labelText: 'Email'),
-          ),
-          const SizedBox(height: 16),
-          TextField(
-            controller: _password,
-            obscureText: true,
-            decoration: const InputDecoration(
-              labelText: 'Password',
-              helperText: 'At least 8 characters',
+      body: Center(
+        child: SingleChildScrollView(
+          padding: const EdgeInsets.all(24),
+          child: ConstrainedBox(
+            constraints: const BoxConstraints(maxWidth: 420),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text(
+                  'Create your account',
+                  style: Theme.of(context).textTheme.headlineSmall,
+                  textAlign: TextAlign.center,
+                ),
+                const SizedBox(height: 8),
+                Text(
+                  'Get started in seconds',
+                  style: Theme.of(context).textTheme.bodyMedium,
+                  textAlign: TextAlign.center,
+                ),
+                const SizedBox(height: 24),
+                TextField(
+                  controller: _email,
+                  keyboardType: TextInputType.emailAddress,
+                  decoration: const InputDecoration(labelText: 'Email'),
+                ),
+                const SizedBox(height: 16),
+                TextField(
+                  controller: _password,
+                  obscureText: true,
+                  decoration: const InputDecoration(
+                    labelText: 'Password',
+                    helperText: 'At least 8 characters',
+                  ),
+                ),
+                const SizedBox(height: 20),
+                SizedBox(
+                  width: double.infinity,
+                  child: FilledButton(
+                    onPressed: session.isLoading
+                        ? null
+                        : () async {
+                            await ref
+                                .read(sessionProvider.notifier)
+                                .register(_email.text.trim(), _password.text);
+                          },
+                    child: session.isLoading
+                        ? const SizedBox(
+                            height: 22,
+                            width: 22,
+                            child: CircularProgressIndicator(strokeWidth: 2),
+                          )
+                        : const Text('Create account'),
+                  ),
+                ),
+                const SizedBox(height: 8),
+                TextButton(
+                  onPressed: () => context.replace('/auth/login'),
+                  child: const Text('Already have an account? Sign in'),
+                ),
+              ],
             ),
           ),
-          const SizedBox(height: 28),
-          FilledButton(
-            onPressed: session.isLoading
-                ? null
-                : () async {
-                    await ref
-                        .read(sessionProvider.notifier)
-                        .register(_email.text.trim(), _password.text);
-                  },
-            child: session.isLoading
-                ? const SizedBox(
-                    height: 22,
-                    width: 22,
-                    child: CircularProgressIndicator(strokeWidth: 2),
-                  )
-                : const Text('REGISTER'),
-          ),
-          TextButton(
-            onPressed: () => context.go('/auth/login'),
-            child: const Text('Already have an account?'),
-          ),
-        ],
+        ),
       ),
     );
   }

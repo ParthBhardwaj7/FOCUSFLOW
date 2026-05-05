@@ -797,12 +797,7 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
                                 final cs = base.colorScheme;
                                 return Theme(
                                   data: base.copyWith(
-                                    colorScheme: cs.brightness == Brightness.light
-                                        ? cs.copyWith(primary: accent)
-                                        : ColorScheme.dark(
-                                            primary: accent,
-                                            surface: TimelineTokens.card,
-                                          ),
+                                    colorScheme: cs.copyWith(primary: accent),
                                   ),
                                   child: child ?? const SizedBox.shrink(),
                                 );
@@ -1213,7 +1208,9 @@ class _BlockAppsRow extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final on = Theme.of(context).colorScheme.onSurface;
+    final cs = Theme.of(context).colorScheme;
+    final on = cs.onSurface;
+    final muted = cs.onSurfaceVariant;
     return Material(
       color: Colors.transparent,
       child: InkWell(
@@ -1265,7 +1262,7 @@ class _BlockAppsRow extends StatelessWidget {
                       Text(
                         'Coming soon — will require Android accessibility permission',
                         style: TextStyle(
-                          color: TimelineTokens.muted.withValues(alpha: 0.45),
+                          color: muted.withValues(alpha: 0.75),
                           fontSize: 11,
                           height: 1.3,
                         ),
@@ -1276,10 +1273,10 @@ class _BlockAppsRow extends StatelessWidget {
                 Switch(
                   value: false,
                   onChanged: null,
-                  inactiveTrackColor: TimelineTokens.muted.withValues(
+                  inactiveTrackColor: muted.withValues(
                     alpha: 0.2,
                   ),
-                  inactiveThumbColor: TimelineTokens.muted.withValues(
+                  inactiveThumbColor: muted.withValues(
                     alpha: 0.5,
                   ),
                 ),
@@ -1314,7 +1311,9 @@ class _FocusSoundscapesBlock extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final on = Theme.of(context).colorScheme.onSurface;
+    final cs = Theme.of(context).colorScheme;
+    final on = cs.onSurface;
+    final muted = cs.onSurfaceVariant;
     return Column(
       mainAxisSize: MainAxisSize.min,
       crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -1340,7 +1339,7 @@ class _FocusSoundscapesBlock extends StatelessWidget {
                 return Material(
                   color: sel
                       ? accent.withValues(alpha: 0.18)
-                      : TimelineTokens.surface,
+                      : TimelineTokens.adaptiveCardPanel(context),
                   borderRadius: BorderRadius.circular(20),
                   child: InkWell(
                     borderRadius: BorderRadius.circular(20),
@@ -1358,7 +1357,7 @@ class _FocusSoundscapesBlock extends StatelessWidget {
                           Text(
                             o.$2,
                             style: TextStyle(
-                              color: sel ? on : TimelineTokens.muted,
+                              color: sel ? on : muted,
                               fontWeight: FontWeight.w700,
                               fontSize: 12,
                             ),
@@ -1672,10 +1671,11 @@ class _ComingSoonChip extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final muted = Theme.of(context).colorScheme.onSurfaceVariant;
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
       decoration: BoxDecoration(
-        color: TimelineTokens.muted.withValues(alpha: 0.16),
+        color: muted.withValues(alpha: 0.16),
         borderRadius: BorderRadius.circular(999),
       ),
       child: Text(
@@ -1684,7 +1684,7 @@ class _ComingSoonChip extends StatelessWidget {
           fontSize: 10,
           fontWeight: FontWeight.w600,
           letterSpacing: 0.2,
-          color: TimelineTokens.muted.withValues(alpha: 0.95),
+          color: muted.withValues(alpha: 0.95),
         ),
       ),
     );

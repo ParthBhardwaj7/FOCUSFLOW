@@ -26,11 +26,19 @@ import 'features/settings/settings_page.dart';
 import 'features/shell/main_shell_scaffold.dart';
 import 'services/timeline_notifications/timeline_notification_sync_host.dart';
 
+String? splashDestinationForSession(AsyncValue<UserModel?> async) {
+  if (async.isLoading) return null;
+  if (async.hasError) return '/auth/login';
+  final user = async.asData?.value;
+  if (user == null) return '/auth/login';
+  return user.needsOnboarding ? '/day0' : '/now';
+}
+
 final goRouterProvider = Provider<GoRouter>((ref) {
   debugPrint('[DEBUG] goRouterProvider building');
   final refresh = ref.watch(goRouterRefreshProvider);
   debugPrint('[DEBUG] goRouterRefreshProvider loaded');
-  
+
   final router = GoRouter(
     refreshListenable: refresh,
     initialLocation: kDevAuthBypass ? '/now' : '/splash',
@@ -38,7 +46,9 @@ final goRouterProvider = Provider<GoRouter>((ref) {
       debugPrint('[DEBUG] GoRouter redirect: ${state.matchedLocation}');
       final loc = state.matchedLocation;
       final async = ref.read(sessionProvider);
-      debugPrint('[DEBUG] sessionProvider state: loading=${async.isLoading}, hasValue=${async.hasValue}, hasError=${async.hasError}');
+      debugPrint(
+        '[DEBUG] sessionProvider state: loading=${async.isLoading}, hasValue=${async.hasValue}, hasError=${async.hasError}',
+      );
 
       if (loc == '/focus' ||
           loc == '/deep-focus' ||
@@ -270,18 +280,28 @@ class _SplashPageState extends ConsumerState<_SplashPage> {
   Timer? _safetyTimer;
   ProviderSubscription<AsyncValue<UserModel?>>? _sessionSub;
 
+  void _leaveSplashIfReady(AsyncValue<UserModel?> async) {
+    final target = splashDestinationForSession(async);
+    if (target == null || !mounted) return;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      context.go(target);
+    });
+  }
+
   @override
   void initState() {
     super.initState();
-    _sessionSub = ref.listenManual<AsyncValue<UserModel?>>(
-      sessionProvider,
-      (prev, next) {
-        if (!next.isLoading) {
-          _safetyTimer?.cancel();
-          _safetyTimer = null;
-        }
-      },
-    );
+    _sessionSub = ref.listenManual<AsyncValue<UserModel?>>(sessionProvider, (
+      prev,
+      next,
+    ) {
+      if (!next.isLoading) {
+        _safetyTimer?.cancel();
+        _safetyTimer = null;
+        _leaveSplashIfReady(next);
+      }
+    });
     _safetyTimer = Timer(kSplashSafetyTimeout, () {
       final async = ref.read(sessionProvider);
       if (!mounted) return;

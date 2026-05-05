@@ -71,7 +71,7 @@ function NavLink({
           : 'px-3 py-2.5 text-[13px] leading-tight',
         active
           ? 'bg-violet-500/20 text-white shadow-sm ring-1 ring-violet-400/35'
-          : 'text-sidebar-foreground/80 hover:bg-white/5 hover:text-sidebar-foreground',
+          : 'text-sidebar-foreground/80 hover:bg-sidebar-accent hover:text-sidebar-foreground',
       )}
     >
       <Icon className={cn('shrink-0 opacity-90', compact ? 'size-4' : 'size-[18px]')} />
@@ -110,7 +110,7 @@ export function AdminShell({ children }: { children: React.ReactNode }) {
           <p>Signed in as operator. Actions are audited.</p>
           <Link
             href="/health"
-            className="mt-2 inline-block text-violet-300/90 underline-offset-2 hover:underline"
+            className="mt-2 inline-block text-violet-500 underline-offset-2 hover:underline dark:text-violet-300/90"
           >
             System health (public)
           </Link>
