@@ -31,6 +31,7 @@ FOCUSFLOW/
 ```
 
 For module-level details, see:
+- `FOCUSFLOW_MASTER.md` — product + technical spec (scope, TZ rules, roadmap)
 - `mobile/README.md`
 - `backend/README.md`
 - `admin-panel/README.md`

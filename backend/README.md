@@ -88,7 +88,7 @@ Unless noted, routes require header `Authorization: Bearer <accessToken>`. Auth 
 | `DELETE` | `/v1/tasks/:id` | — | Owner-only |
 | `POST` | `/v1/focus-sessions` | `{ "taskId"?, "plannedDurationSec", "subtasksSnapshot"? }` | Starts `PENDING` session |
 | `PATCH` | `/v1/focus-sessions/:id` | `{ "outcome": "COMPLETED" \| "SKIPPED" }` | Sets `endedAt` |
-| `GET` | `/v1/timeline` | `?on=YYYY-MM-DD` | Timeline slots for that **UTC** calendar day (`startsAt` in `[onT00:00Z, nextDay)`), ordered by time |
+| `GET` | `/v1/timeline` | `?on=YYYY-MM-DD` | Timeline slots for that calendar day: if `User.timeZone` is set (IANA, from the mobile client), **`on` is that local day**; otherwise **`on` is a UTC calendar day** (legacy). Ordered by `startsAt`. |
 | `POST` | `/v1/timeline` | `{ "startsAt", "endsAt", "title", "iconKey"?, "tag"?, "soundLabel"?, "status"?, "linkedTaskId"?, "sortOrder"? }` | ISO 8601 for `startsAt` / `endsAt`; `status` ∈ `UPCOMING` \| `ACTIVE` \| `DONE` \| `MISSED` \| `SKIPPED` |
 | `PATCH` | `/v1/timeline/:id` | partial same fields | Owner-only |
 | `DELETE` | `/v1/timeline/:id` | — | Owner-only |

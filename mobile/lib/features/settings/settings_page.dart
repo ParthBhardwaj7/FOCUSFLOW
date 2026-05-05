@@ -306,6 +306,9 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
 
   Future<void> _resyncNotifications() async {
     try {
+      if (!await NotificationBootstrap.notificationsEnabled()) {
+        await NotificationBootstrap.requestOsNotificationPermission();
+      }
       final store = await ref.read(timelineLocalStoreProvider.future);
       await TimelineNotificationScheduler.syncFromLocalStore(store);
       await DailyBehavioralScheduler.syncFromLocalStore(store);
@@ -816,6 +819,26 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
                       ],
                     ),
                   ),
+              _sectionHeader(context, 'REMINDERS HELP'),
+              const SizedBox(height: 10),
+              _settingsCard(
+                context,
+                children: [
+                  Padding(
+                    padding: const EdgeInsets.fromLTRB(16, 14, 16, 14),
+                    child: Text(
+                      'If reminders are late or missing, some phones limit background alarms or battery optimization. Turn off battery restrictions for FocusFlow and allow exact alarms when the system prompts you.',
+                      style: TextStyle(
+                        color: theme.colorScheme.onSurface.withValues(
+                          alpha: 0.76,
+                        ),
+                        fontSize: 13,
+                        height: 1.4,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
               _sectionHeader(context, 'APPEARANCE'),
               const SizedBox(height: 10),
               ref

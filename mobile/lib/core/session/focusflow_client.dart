@@ -574,6 +574,13 @@ class FocusFlowClient {
     return res.data!;
   }
 
+  /// Lists server [TimelineSlot] rows for calendar day [on] (`YYYY-MM-DD`).
+  ///
+  /// When `User.timeZone` is set on the server (synced from this device), the API
+  /// treats [on] as that **local calendar** day. If `timeZone` is absent, the
+  /// server uses a **UTC** calendar day. The shipped client uses planner
+  /// snapshots + local SQLite as source of truth; this call is mainly for APIs
+  /// and tooling.
   Future<List<TimelineSlotModel>> listTimeline(String on) async {
     final res = await _auth.get<List<dynamic>>(
       '/v1/timeline',

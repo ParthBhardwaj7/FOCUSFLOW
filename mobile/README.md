@@ -34,9 +34,9 @@ Set **`API_BASE_URL`** correctly for your device so online features work when th
 2. **`API_BASE_URL`** in `mobile/.env` must point at your machine from the **device** (emulator: `http://10.0.2.2:3000`; USB phone: `adb reverse tcp:3000 tcp:3000` + `http://127.0.0.1:3000`, or your PC LAN IP).
 3. Snackbars now show a **short Dio message** (connection vs HTTP body). If you see **connection error**, it is almost always “API not reachable”, not bad password.
 
-### Timeline day: local `on=` vs server UTC bucket
+### Timeline day and time zones
 
-The app’s week strip and “selected day” use **`YYYY-MM-DD` in the device’s local calendar**. The backend `GET /v1/timeline?on=` interprets `on` as a **UTC calendar day** (`onT00:00:00.000Z` … next midnight UTC). Near time-zone boundaries or late evening, a local date can map to a different set of slots than you expect. Creating slots uses **local date + local time → converted to UTC** in the client so wall times match what you pick in the UI.
+The week strip and selected day use **`YYYY-MM-DD` in the device’s local calendar**. After sign-in, the app syncs the device IANA zone to `User.timeZone` on the server. Then `GET /v1/timeline?on=` interprets `on` as a **local calendar day in that zone** (when `timeZone` is set); otherwise the API falls back to **UTC day** (legacy). Full policy: [`../FOCUSFLOW_MASTER.md`](../FOCUSFLOW_MASTER.md). Slot creation still uses **local date + local time → UTC** so wall times match the UI.
 
 ## Run
 

@@ -11,16 +11,17 @@ Use this before inviting testers or moving to closed production.
 
 ## Policies and store listing
 
-- [ ] Privacy policy URL (even for MVP) if you collect accounts, tasks, or analytics.
+- [ ] Privacy policy URL (even for MVP) if you collect accounts, tasks, or analytics. Draft sections: [`PRIVACY_POLICY_TEMPLATE.md`](PRIVACY_POLICY_TEMPLATE.md).
 - [ ] Short + full description, screenshots (phone), feature graphic.
 - [ ] Content rating questionnaire completed.
 
 ## Android runtime (FocusFlow-specific)
 
 - [ ] **INTERNET** — already in manifest; verify API reachable from device network.
-- [ ] **POST_NOTIFICATIONS** — request at runtime on Android 13+ before scheduling real reminders (stub exists only).
-- [ ] **Foreground service** — if you ship long focus sessions with audio, declare the correct `foregroundServiceType` (e.g. `mediaPlayback`) and match Play policy; remove `usesCleartextTraffic` for production builds or scope via network security config.
-- [ ] **Battery / OEM** — document in-app FAQ if users report timer kills (common on aggressive OEMs).
+- [x] **POST_NOTIFICATIONS** — runtime request via `NotificationBootstrap.requestOsNotificationPermission()` when **Gentle nudges** is turned on, on cold start if gentle nudges are enabled, and before rescheduling when notification toggles under **NOTIFICATIONS** change (see `settings_page.dart` / `notification_bootstrap.dart`).
+- [ ] **Foreground service** — if you ship long focus sessions with audio, declare the correct `foregroundServiceType` (e.g. `mediaPlayback`) and match Play policy. *(Track separately in the audio / FGS pass.)*
+- [x] **Cleartext traffic** — `src/main/AndroidManifest.xml` sets `usesCleartextTraffic="false"` for **release** builds; **debug** and **profile** manifests overlay `true` so local HTTP (`http://10.0.2.2:3000`, LAN IP, etc.) still works. Ship production APIs on **HTTPS** only.
+- [x] **Battery / OEM** — Settings tab includes **REMINDERS HELP** with guidance on battery optimization and exact alarms when users miss nudges.
 
 ## Quality
 

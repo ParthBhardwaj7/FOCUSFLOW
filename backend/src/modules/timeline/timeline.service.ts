@@ -6,7 +6,11 @@ import {
 } from '@nestjs/common';
 import { TimelineSlotStatus } from '@prisma/client';
 import type { Prisma } from '@prisma/client';
-import { parseDayUtcBounds } from '../../common/utils/ymd';
+import {
+  isValidIanaTimeZone,
+  parseDayBoundsInTimeZone,
+  parseDayUtcBounds,
+} from '../../common/utils/ymd';
 import { PrismaService } from '../../prisma/prisma.service';
 import type { CreateTimelineSlotDto } from './dto/create-timeline-slot.dto';
 import type { UpdateTimelineSlotDto } from './dto/update-timeline-slot.dto';
@@ -15,8 +19,16 @@ import type { UpdateTimelineSlotDto } from './dto/update-timeline-slot.dto';
 export class TimelineService {
   constructor(private readonly prisma: PrismaService) {}
 
-  listForDay(userId: string, on: string) {
-    const { start, end } = parseDayUtcBounds(on);
+  async listForDay(userId: string, on: string) {
+    const user = await this.prisma.user.findUnique({
+      where: { id: userId },
+      select: { timeZone: true },
+    });
+    const tz = user?.timeZone?.trim() ?? '';
+    const { start, end } =
+      tz && isValidIanaTimeZone(tz)
+        ? parseDayBoundsInTimeZone(on, tz)
+        : parseDayUtcBounds(on);
     return this.prisma.timelineSlot.findMany({
       where: {
         userId,

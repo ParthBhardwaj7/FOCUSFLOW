@@ -14,6 +14,7 @@ import '../dev_config.dart';
 import '../runtime_remote_sync.dart';
 import '../models/user_model.dart';
 import '../providers.dart';
+import '../user_timezone_sync.dart';
 import '../timeline_local_provider.dart';
 import '../../data/inbox_local_store.dart';
 import '../../features/inbox/inbox_providers.dart';
@@ -87,11 +88,14 @@ class SessionController extends AsyncNotifier<UserModel?> {
       // ≤4s instead of 15s on cold start with WiFi but no backend.
       final fresh = await client.me(coldStart: true);
       if (!ref.mounted) return;
-      state = AsyncData(fresh);
+      final withTz =
+          await syncServerTimeZoneWithDeviceIfNeeded(client, fresh);
+      if (!ref.mounted) return;
+      state = AsyncData(withTz);
       notifyGoRouterAuthChanged(ref);
       // Flags already queued by build(); skip the second queue call here —
       // it would be a no-op since the mutex serialises them anyway.
-      scheduleUrgentPlannerPullIfSignedIn(ref, fresh);
+      scheduleUrgentPlannerPullIfSignedIn(ref, withTz);
     } on DioException catch (e) {
       if (!ref.mounted) return;
       if (e.response?.statusCode == 401) {
@@ -116,7 +120,9 @@ class SessionController extends AsyncNotifier<UserModel?> {
     });
     if (ref.mounted) {
       notifyGoRouterAuthChanged(ref);
-      scheduleUrgentPlannerPullIfSignedIn(ref, state.asData?.value);
+      final u = state.asData?.value;
+      scheduleUrgentPlannerPullIfSignedIn(ref, u);
+      if (u != null) unawaited(_quietlySyncDeviceTimeZone(u));
     }
   }
 
@@ -131,7 +137,9 @@ class SessionController extends AsyncNotifier<UserModel?> {
     });
     if (ref.mounted) {
       notifyGoRouterAuthChanged(ref);
-      scheduleUrgentPlannerPullIfSignedIn(ref, state.asData?.value);
+      final u = state.asData?.value;
+      scheduleUrgentPlannerPullIfSignedIn(ref, u);
+      if (u != null) unawaited(_quietlySyncDeviceTimeZone(u));
     }
   }
 
@@ -152,7 +160,9 @@ class SessionController extends AsyncNotifier<UserModel?> {
     });
     if (ref.mounted) {
       notifyGoRouterAuthChanged(ref);
-      scheduleUrgentPlannerPullIfSignedIn(ref, state.asData?.value);
+      final u = state.asData?.value;
+      scheduleUrgentPlannerPullIfSignedIn(ref, u);
+      if (u != null) unawaited(_quietlySyncDeviceTimeZone(u));
     }
   }
 
@@ -199,9 +209,11 @@ class SessionController extends AsyncNotifier<UserModel?> {
     try {
       final user = await c.me();
       if (!ref.mounted) return;
-      state = AsyncData(user);
+      final withTz = await syncServerTimeZoneWithDeviceIfNeeded(c, user);
+      if (!ref.mounted) return;
+      state = AsyncData(withTz);
       notifyGoRouterAuthChanged(ref);
-      scheduleUrgentPlannerPullIfSignedIn(ref, user);
+      scheduleUrgentPlannerPullIfSignedIn(ref, withTz);
     } on DioException catch (e) {
       if (!ref.mounted) return;
       if (e.response?.statusCode == 401) {
@@ -225,7 +237,9 @@ class SessionController extends AsyncNotifier<UserModel?> {
     );
     if (ref.mounted) {
       notifyGoRouterAuthChanged(ref);
-      scheduleUrgentPlannerPullIfSignedIn(ref, state.asData?.value);
+      final u = state.asData?.value;
+      scheduleUrgentPlannerPullIfSignedIn(ref, u);
+      if (u != null) unawaited(_quietlySyncDeviceTimeZone(u));
     }
   }
 
@@ -233,6 +247,21 @@ class SessionController extends AsyncNotifier<UserModel?> {
     state = AsyncData(u);
     notifyGoRouterAuthChanged(ref);
     scheduleUrgentPlannerPullIfSignedIn(ref, u);
+  }
+
+  /// PATCH `timeZone` without blocking auth flows; refreshes session if server changes.
+  Future<void> _quietlySyncDeviceTimeZone(UserModel user) async {
+    if (kDevAuthBypass || !ref.mounted) return;
+    try {
+      final client = ref.read(focusFlowClientProvider);
+      final next = await syncServerTimeZoneWithDeviceIfNeeded(client, user);
+      if (!ref.mounted) return;
+      if (next != user) {
+        state = AsyncData(next);
+        notifyGoRouterAuthChanged(ref);
+        scheduleUrgentPlannerPullIfSignedIn(ref, next);
+      }
+    } catch (_) {}
   }
 }
 

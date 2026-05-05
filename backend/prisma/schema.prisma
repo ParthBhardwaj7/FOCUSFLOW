@@ -1,4 +1,4 @@
-// FocusFlow MVP domain — auth, tasks, focus sessions (see FOCUSFLOW_MASTER.md §4).
+// FocusFlow domain — see ../../FOCUSFLOW_MASTER.md (calendar / API semantics, roadmap).
 
 generator client {
   provider = "prisma-client-js"
