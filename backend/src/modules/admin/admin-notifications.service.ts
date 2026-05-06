@@ -1,7 +1,10 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { PushTargetType, UserPlan, type Prisma } from '@prisma/client';
-import { resolveFcmServerKey, isFcmConfigured } from '../../common/utils/fcm-server-key';
+import {
+  resolveFcmServerKey,
+  isFcmConfigured,
+} from '../../common/utils/fcm-server-key';
 import { PrismaService } from '../../prisma/prisma.service';
 import { AuditLogService } from './audit-log.service';
 

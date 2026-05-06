@@ -55,6 +55,17 @@ void resetServerUnreachableBackoff() {
   _onServerReachable?.call();
 }
 
+/// When Wi‑Fi is up but the API failed, we mute requests for [cooldown]. After
+/// that window, [isServerKnownUnreachable] becomes false but [serverReachableProvider]
+/// might still be stuck `false` unless a successful request cleared it — so inbox
+/// never retried. Call this before sync paths that should run again after cooldown.
+void alignServerReachableAfterBackoff() {
+  final now = DateTime.now().millisecondsSinceEpoch;
+  if (now >= _serverUnreachableUntilMs) {
+    _onServerReachable?.call();
+  }
+}
+
 void _setServerUnreachable() {
   _serverUnreachableUntilMs =
       DateTime.now().millisecondsSinceEpoch + _kServerUnreachableCooldownMs;

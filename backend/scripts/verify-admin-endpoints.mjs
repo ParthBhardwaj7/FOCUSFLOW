@@ -1,5 +1,5 @@
 /**
- * Smoke-test Nest admin routes (same paths the Next admin panel uses).
+ * Smoke-test public + Nest admin routes (same paths the Next admin panel uses).
  *
  * From backend/ (server should be running on API_ORIGIN, default http://localhost:3000):
  *   node scripts/verify-admin-endpoints.mjs
@@ -9,12 +9,20 @@
  *   DEV_ADMIN_EMAIL=dev-admin@focusflow.local
  *   DEV_ADMIN_PASSWORD=FocusFlow_Dev1!
  *
- * Covers GET routes used by the Next admin panel. Mutations (POST/PATCH/PUT) are not
- * exercised here; test those manually or extend this script with disposable fixtures.
+ * Part A: unauthenticated mobile/public endpoints.
+ * Part B: admin JWT + GET routes used by the admin panel.
+ * Mutations (POST/PATCH/PUT) are not exercised; see docs/MANUAL_QA_RUNBOOK.md.
  */
 const origin = (process.env.API_ORIGIN ?? 'http://localhost:3000').replace(/\/+$/, '');
 const email = (process.env.DEV_ADMIN_EMAIL ?? 'dev-admin@focusflow.local').trim().toLowerCase();
 const password = process.env.DEV_ADMIN_PASSWORD ?? 'FocusFlow_Dev1!';
+
+async function getPublic(path) {
+  const res = await fetch(`${origin}${path}`, {
+    headers: { Accept: 'application/json' },
+  });
+  return { ok: res.ok, status: res.status, path };
+}
 
 async function login() {
   const res = await fetch(`${origin}/admin/auth/login`, {
@@ -43,6 +51,33 @@ async function get(token, path, init = {}) {
 }
 
 async function main() {
+  const publicChecks = [
+    '/health',
+    '/v1/health',
+    '/v1/ready',
+    '/v1/config/public',
+  ];
+
+  const publicRows = [];
+  for (const path of publicChecks) {
+    const r = await getPublic(path);
+    publicRows.push({ path, ...r });
+  }
+
+  let pubFail = 0;
+  console.log('--- Public (no auth) ---');
+  for (const r of publicRows) {
+    const mark = r.ok ? 'OK ' : 'FAIL';
+    if (!r.ok) pubFail++;
+    console.log(`${mark} ${r.status}\t${r.path}`);
+  }
+  console.log('');
+
+  if (pubFail) {
+    console.error(`${pubFail} public request(s) failed. Is the API running at ${origin}?`);
+    process.exit(1);
+  }
+
   let token;
   try {
     token = await login();
@@ -52,6 +87,7 @@ async function main() {
     process.exit(1);
   }
 
+  console.log('--- Admin (JWT) ---');
   const checks = [
     ['GET', '/admin/dashboard/stats'],
     ['GET', '/admin/dashboard/charts?range=30d'],
@@ -103,10 +139,12 @@ async function main() {
   }
   console.log('');
   if (fail) {
-    console.error(`${fail} request(s) failed.`);
+    console.error(`${fail} admin request(s) failed.`);
     process.exit(1);
   }
-  console.log(`All ${rows.length} checks passed.`);
+  console.log(
+    `All checks passed: ${publicRows.length} public + ${rows.length} admin (${publicRows.length + rows.length} total).`,
+  );
 }
 
 main().catch((e) => {

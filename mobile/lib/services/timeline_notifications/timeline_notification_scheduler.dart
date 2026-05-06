@@ -1,5 +1,3 @@
-import 'dart:io';
-
 import 'package:flutter/foundation.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:timezone/timezone.dart' as tz;
@@ -436,35 +434,9 @@ Future<void> _zoned(
       body: body,
     );
   } catch (e, st) {
-    if (scheduleMode == AndroidScheduleMode.exactAllowWhileIdle &&
-        Platform.isAndroid) {
-      debugPrint('Exact schedule failed, retry inexact: $e\n$st');
-      await plugin.cancel(id: id);
-      await plugin.zonedSchedule(
-        id: id,
-        scheduledDate: scheduled,
-        notificationDetails: NotificationDetails(
-          android: AndroidNotificationDetails(
-            channelId,
-            _channelLabel(channelId),
-            channelDescription: 'FocusFlow execution nudges',
-            importance: importance,
-            priority: priority,
-            autoCancel: false,
-          ),
-          iOS: const DarwinNotificationDetails(
-            presentAlert: true,
-            presentBadge: true,
-            presentSound: true,
-          ),
-        ),
-        androidScheduleMode: AndroidScheduleMode.inexactAllowWhileIdle,
-        title: title,
-        body: body,
-      );
-    } else {
-      debugPrint('zonedSchedule failed: $e\n$st');
-    }
+    // Do not fall back to inexact alarms — they routinely fire minutes late.
+    // User needs Settings → Apps → FocusFlow → Alarms & reminders (Android 12+).
+    debugPrint('Timeline zonedSchedule failed: $e\n$st');
   }
 }
 

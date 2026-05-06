@@ -38,6 +38,7 @@ class _FcmTokenSyncHostState extends ConsumerState<FcmTokenSyncHost>
   void initState() {
     super.initState();
     if (kIsWeb) return;
+    if (!_firebaseOk) return;
 
     WidgetsBinding.instance.addObserver(this);
 

@@ -5,8 +5,8 @@ import 'package:url_launcher/url_launcher.dart';
 import 'api_config.dart';
 import 'user_facing_errors.dart' show messageLooksLeakedOrTechnical;
 
-const _unreachableTitle = '😔 FocusFlow is unreachable';
-const _unreachableBody = 'Check your internet connection and try again.';
+const _unreachableTitle = '😔 Can’t connect right now';
+const _unreachableBody = 'Connect to the internet, then tap Retry.';
 const _restartHint = "Still can't connect? Try restarting the app.";
 
 /// Shown for network / leaked-config style failures with retry (max 3 attempts per sheet).

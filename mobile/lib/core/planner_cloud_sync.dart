@@ -8,7 +8,8 @@ import '../features/inbox/inbox_providers.dart';
 import '../features/settings/settings_providers.dart';
 import '../features/timeline/timeline_providers.dart';
 import 'connectivity_util.dart';
-import 'runtime_remote_sync.dart' show isServerKnownUnreachable;
+import 'runtime_remote_sync.dart'
+    show alignServerReachableAfterBackoff, isServerKnownUnreachable;
 import 'day_local.dart';
 import 'dev_config.dart';
 import 'providers.dart';
@@ -91,9 +92,11 @@ class PlannerCloudSyncCoordinator {
     final net = _ref.read(connectivityProvider);
     final offline = net.maybeWhen(
       data: (r) => connectivityLooksOfflineOnly(r),
-      orElse: () => false,
+      // Unknown/loading connectivity should not trigger network pull.
+      orElse: () => true,
     );
     if (offline) return;
+    alignServerReachableAfterBackoff();
     // Skip when server is known unreachable (WiFi up but API down).
     if (isServerKnownUnreachable()) return;
     if (_pullRunning) return;

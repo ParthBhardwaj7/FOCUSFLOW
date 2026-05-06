@@ -368,7 +368,7 @@ class _AiPageState extends ConsumerState<AiPage> {
                   const SizedBox(width: 10),
                   Expanded(
                     child: Text(
-                      'AI chat needs a server connection. Local insights above are still available.',
+                      'Connect to the internet to use AI chat. Your tips above still work on this device.',
                       style: TextStyle(
                         color: scheme.onSurfaceVariant.withValues(alpha: 0.85),
                         fontSize: 13,

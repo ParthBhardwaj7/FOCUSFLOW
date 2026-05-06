@@ -47,6 +47,10 @@ bool messageLooksLeakedOrTechnical(String message) {
     'SQLITE',
     'DIOEXCEPTION',
     'BASEOPTIONS',
+    'INTERNAL SERVER',
+    'BAD GATEWAY',
+    'SERVICE UNAVAILABLE',
+    'GATEWAY TIMEOUT',
   ];
   for (final n in needles) {
     if (m.contains(n)) return true;
@@ -74,7 +78,7 @@ String userFacingError(Object error) {
   if (error is StateError) {
     final msg = error.message;
     if (msg.contains('API_BASE_URL')) {
-      return "Can't reach FocusFlow right now. Check your internet and try again.";
+      return "We couldn't reach FocusFlow. Connect to the internet and try again.";
     }
   }
   if (error is DioException) {
@@ -98,16 +102,16 @@ String userFacingError(Object error) {
 
 String _dioExceptionMessage(DioException e) {
   if (isRecoverableNetworkDioError(e)) {
-    return "Can't reach FocusFlow right now. Check your internet and try again.";
+    return "We couldn't reach FocusFlow. Connect to the internet and try again.";
   }
 
   switch (e.type) {
     case DioExceptionType.connectionTimeout:
     case DioExceptionType.sendTimeout:
     case DioExceptionType.receiveTimeout:
-      return 'The request took too long. Check your connection and try again.';
+      return 'This is taking too long. Connect to the internet and try again.';
     case DioExceptionType.connectionError:
-      return "Can't reach FocusFlow right now. Check your internet and try again.";
+      return "We couldn't reach FocusFlow. Connect to the internet and try again.";
     case DioExceptionType.badResponse:
       return _badResponseMessage(e);
     default:
@@ -158,7 +162,7 @@ String _badResponseMessage(DioException e) {
       return "The coach isn't available right now. Your planner on this device still works.";
     default:
       if (code != null && code >= 500) {
-        return 'FocusFlow is having a server problem. Please try again in a few minutes.';
+        return 'FocusFlow is temporarily unavailable. Please try again in a few minutes.';
       }
       if (code != null && code >= 400 && code < 500) {
         if (serverMessage != null && !_looksTechnical(serverMessage)) {

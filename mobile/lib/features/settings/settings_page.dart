@@ -260,7 +260,7 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
           ),
           content: Text(
             'Removes on-device timeline cache and pending sync queue. '
-            'Server data is unchanged if you are signed in.',
+            'If you’re signed in, your account and cloud backup stay as they are.',
             style: TextStyle(
               color: muted.withValues(alpha: 0.95),
               fontSize: 14,
@@ -307,7 +307,9 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
   Future<void> _resyncNotifications() async {
     try {
       if (!await NotificationBootstrap.notificationsEnabled()) {
-        await NotificationBootstrap.requestOsNotificationPermission();
+        await NotificationBootstrap.prepareOsForScheduledNudges();
+      } else {
+        await NotificationBootstrap.ensureAndroidExactAlarmAccess();
       }
       final store = await ref.read(timelineLocalStoreProvider.future);
       await TimelineNotificationScheduler.syncFromLocalStore(store);
@@ -626,8 +628,10 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
                               accent: accent,
                               icon: '🔔',
                               title: 'Gentle nudges',
-                              subtitle:
-                                  'Start, late, and end-of-block pushes\nfrom your timeline.',
+                              subtitle: Platform.isAndroid
+                                  ? 'Start, late, and end-of-block pushes from your timeline.\n'
+                                      'If Android asks for alarms, allow it so nudges arrive on time.'
+                                  : 'Start, late, and end-of-block pushes\nfrom your timeline.',
                               subtitleMuted: !prefs.gentleNudges,
                               value: prefs.gentleNudges,
                               onChanged: (v) async {
@@ -645,7 +649,10 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
                                       : 'Gentle nudges disabled',
                                 );
                                 if (v) {
-                                  await NotificationBootstrap.requestOsNotificationPermission();
+                                  await NotificationBootstrap
+                                      .prepareOsForScheduledNudges(
+                                    bypassExactAlarmThrottle: true,
+                                  );
                                   final store = await ref.read(
                                     timelineLocalStoreProvider.future,
                                   );
@@ -1060,7 +1067,7 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
                     icon: '🧹',
                     title: 'Clear local data',
                     subtitle:
-                        'Wipes on-device planner cache (server unchanged)',
+                        'Clears planner cache on this device only; your account is unchanged',
                     onTap: _clearLocalData,
                   ),
                 ],

@@ -62,7 +62,7 @@ class _TimelineNotificationSyncHostState
 
     // Android 13+ / iOS: schedulers no-op until OS permission is granted — prompt here
     // (Settings also requests when toggling gentle nudges).
-    await NotificationBootstrap.requestOsNotificationPermission();
+    await NotificationBootstrap.prepareOsForScheduledNudges();
     ref.invalidate(osTimelineNotificationsEnabledProvider);
 
     final store = await ref.read(timelineLocalStoreProvider.future);
@@ -87,6 +87,13 @@ class _TimelineNotificationSyncHostState
   Future<void> _runDeferredRemoteSync() async {
     if (kDevAuthBypass) return;
     if (!mounted) return;
+    final net = ref.read(connectivityProvider);
+    final offline = net.maybeWhen(
+      data: (r) => inboxConnectivityLooksOffline(r),
+      // Unknown/loading connectivity: stay offline-safe and skip remote work.
+      orElse: () => true,
+    );
+    if (offline) return;
 
     if (!isServerKnownUnreachable()) {
       try {

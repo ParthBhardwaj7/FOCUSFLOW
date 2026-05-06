@@ -9,7 +9,8 @@ import '../../core/api_config.dart';
 import '../../core/connectivity_util.dart';
 import '../../core/models/note_model.dart';
 import '../../core/providers.dart';
-import '../../core/runtime_remote_sync.dart' show isServerKnownUnreachable;
+import '../../core/runtime_remote_sync.dart'
+    show alignServerReachableAfterBackoff, isServerKnownUnreachable;
 import '../../core/server_status_provider.dart';
 import '../../data/inbox_local_store.dart';
 
@@ -80,10 +81,11 @@ bool inboxConnectivityLooksOffline(List<ConnectivityResult>? results) {
 
 /// Server + local outbox, newest first. Recoverable list failures still show locals.
 ///
-/// Offline / server-unreachable → returns local SQLite drafts AND cached server notes **immediately**
-/// (no network timeout wait). When online and server is reachable, merges remote
-/// notes on top of local drafts and updates the local cache. Rebuilds reactively when
-/// [serverReachableProvider] or [connectivityProvider] changes.
+/// Offline / API cooldown → returns local SQLite drafts AND cached server notes **immediately**
+/// (no network timeout wait). When online and not in unreachable backoff, merges remote
+/// notes on top of local drafts and updates the local cache. Rebuilds when
+/// [connectivityProvider] or [serverReachableProvider] changes ([alignServerReachableAfterBackoff]
+/// updates the latter when the backoff window ends).
 final inboxMergedProvider = FutureProvider.autoDispose<List<NoteModel>>((
   ref,
 ) async {
@@ -95,7 +97,10 @@ final inboxMergedProvider = FutureProvider.autoDispose<List<NoteModel>>((
 
   // Watch both connectivity and server status so we rebuild when either changes.
   final net = ref.watch(connectivityProvider);
-  final serverReachable = ref.watch(serverReachableProvider);
+  ref.watch(serverReachableProvider);
+
+  /// Heal stale "server down" UI after the unreachable cooldown expires.
+  alignServerReachableAfterBackoff();
 
   final offline = net.maybeWhen(
     data: (r) => inboxConnectivityLooksOffline(r),
@@ -119,8 +124,8 @@ final inboxMergedProvider = FutureProvider.autoDispose<List<NoteModel>>((
       );
   final cachedServerNotes = store.serverAsNotes(cachedServerRows);
 
-  // Skip network entirely when offline OR server known unreachable.
-  if (offline || !serverReachable || isServerKnownUnreachable()) {
+  // Skip network when offline or in API unreachable cooldown (matches planner).
+  if (offline || isServerKnownUnreachable()) {
     final byId = <String, NoteModel>{};
     for (final n in cachedServerNotes) {
       byId[n.id] = n;
@@ -186,7 +191,9 @@ Future<void> syncInboxOutbox(WidgetRef ref) async {
   if (isServerKnownUnreachable()) return;
   final netAsync = ref.read(connectivityProvider);
   final net = netAsync.value;
-  if (net != null && inboxConnectivityLooksOffline(net)) return;
+  // Treat unknown/loading connectivity as offline-safe: avoid noisy retries
+  // while radios are still initializing after resume.
+  if (net == null || inboxConnectivityLooksOffline(net)) return;
 
   final client = ref.read(focusFlowClientProvider);
   final store = await ref.read(inboxLocalStoreProvider.future);

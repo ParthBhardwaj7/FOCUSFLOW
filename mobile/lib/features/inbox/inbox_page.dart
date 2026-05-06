@@ -1052,8 +1052,8 @@ class _InboxPageState extends ConsumerState<InboxPage>
                               Expanded(
                                 child: Text(
                                   osOffline
-                                      ? 'Offline — notes saved locally, syncing when reconnected.'
-                                      : 'Server unreachable — showing local drafts. Sync resumes automatically.',
+                                      ? 'Offline — notes saved on this device; they’ll sync when you’re back online.'
+                                      : 'Can’t connect right now — showing notes saved on this device. They’ll sync when you’re online again.',
                                   style: TextStyle(
                                     color: Theme.of(context)
                                         .colorScheme

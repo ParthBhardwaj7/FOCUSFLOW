@@ -27,6 +27,7 @@
     "db:seed": "prisma db seed",
     "db:dev-admin": "node scripts/ensure-dev-admin.mjs",
     "verify:admin-api": "node scripts/verify-admin-endpoints.mjs",
+    "verify:ci": "npm run build && npm test && npm run test:e2e && prisma validate && eslint \"{src,apps,libs,test}/**/*.ts\" --max-warnings 0",
     "db:studio": "prisma studio",
     "db:validate": "prisma validate",
     "token:dev": "node scripts/sign-access-token.cjs"

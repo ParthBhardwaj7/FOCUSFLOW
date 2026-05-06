@@ -1,4 +1,6 @@
 import 'package:connectivity_plus/connectivity_plus.dart';
+import 'package:firebase_core/firebase_core.dart';
+import 'package:firebase_core_platform_interface/test.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -16,6 +18,12 @@ import 'package:focusflow_mobile/features/timeline/timeline_screen.dart';
 import 'package:focusflow_mobile/router.dart';
 
 void main() {
+  setUpAll(() async {
+    TestWidgetsFlutterBinding.ensureInitialized();
+    setupFirebaseCoreMocks();
+    await Firebase.initializeApp();
+  });
+
   test('splashDestinationForSession resolves auth targets', () {
     expect(
       splashDestinationForSession(const AsyncValue<UserModel?>.loading()),

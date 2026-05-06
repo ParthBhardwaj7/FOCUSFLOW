@@ -578,7 +578,7 @@ class _TimelineScreenState extends ConsumerState<TimelineScreen>
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
             content: Text(
-              'Timer started offline — focus won’t sync to the server.',
+              'Timer started offline — your session will sync when you’re back online.',
             ),
           ),
         );
@@ -618,7 +618,7 @@ class _TimelineScreenState extends ConsumerState<TimelineScreen>
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
           content: Text(
-            'Deep focus offline — session won’t sync until the API is reachable.',
+            'Deep focus offline — your session will sync when you’re back online.',
           ),
         ),
       );

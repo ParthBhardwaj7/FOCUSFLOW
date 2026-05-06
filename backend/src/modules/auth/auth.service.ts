@@ -98,7 +98,10 @@ export class AuthService {
         }
       | undefined;
     try {
-      const ticket = await this.googleOAuth.verifyIdToken({ idToken, audience });
+      const ticket = await this.googleOAuth.verifyIdToken({
+        idToken,
+        audience,
+      });
       payload = ticket.getPayload();
     } catch {
       if (!accessToken || accessToken.trim().length == 0) {
@@ -124,7 +127,9 @@ export class AuthService {
       return this.issueFreshSession(existing.id, existing.email);
     }
 
-    const passwordHash = await argon2.hash(randomBytes(24).toString('base64url'));
+    const passwordHash = await argon2.hash(
+      randomBytes(24).toString('base64url'),
+    );
     const user = await this.prisma.user.create({
       data: {
         email,

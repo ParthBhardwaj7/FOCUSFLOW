@@ -1,5 +1,3 @@
-import 'dart:io';
-
 import 'package:flutter/foundation.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:timezone/timezone.dart' as tz;
@@ -188,20 +186,6 @@ Future<void> _zoned({
       body: body,
     );
   } catch (e, st) {
-    if (scheduleMode == AndroidScheduleMode.exactAllowWhileIdle &&
-        Platform.isAndroid) {
-      debugPrint('Daily zoned exact failed, retry inexact: $e\n$st');
-      await plugin.cancel(id: id);
-      await plugin.zonedSchedule(
-        id: id,
-        scheduledDate: scheduled,
-        notificationDetails: details,
-        androidScheduleMode: AndroidScheduleMode.inexactAllowWhileIdle,
-        title: title,
-        body: body,
-      );
-    } else {
-      debugPrint('Daily zonedSchedule failed: $e\n$st');
-    }
+    debugPrint('Daily zonedSchedule failed: $e\n$st');
   }
 }

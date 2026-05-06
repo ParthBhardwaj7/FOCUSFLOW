@@ -5,6 +5,7 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/scheduler.dart' show SchedulerBinding;
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:flutter_timezone/flutter_timezone.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'package:timezone/data/latest.dart' as tzdata;
 import 'package:timezone/timezone.dart' as tz;
 
@@ -25,6 +26,8 @@ class NotificationBootstrap {
   static const channelCelebrate = 'ff_celebrate';
   /// Server-driven FCM payloads (admin / marketing) surfaced while app is foreground.
   static const channelAdminPush = 'ff_admin_push';
+
+  static const _kExactAlarmPromptMs = 'ff_exact_alarm_prompt_ms';
 
   static var _initialized = false;
 
@@ -139,7 +142,7 @@ class NotificationBootstrap {
   static Future<void> _requestPermissionIfGentleOnColdStart() async {
     try {
       if (await readGentleNudgesEnabled()) {
-        await requestOsNotificationPermission();
+        await prepareOsForScheduledNudges();
       }
     } catch (e) {
       debugPrint('Cold-start notification permission: $e');
@@ -178,7 +181,50 @@ class NotificationBootstrap {
     }
   }
 
-  /// Prefer exact alarms when the OS allows; otherwise inexact delivery.
+  /// Android 12+: without this, alarms use [inexactAllowWhileIdle] and can
+  /// fire several minutes late. Opens system settings when needed.
+  ///
+  /// [bypassThrottle] — use when the user explicitly opts into nudges so we
+  /// always offer the exact-alarm screen; otherwise we prompt at most once
+  /// per [throttle] on background resumes to avoid nagging.
+  static Future<void> ensureAndroidExactAlarmAccess({
+    bool bypassThrottle = false,
+    Duration throttle = const Duration(days: 7),
+  }) async {
+    if (kIsWeb || !Platform.isAndroid) return;
+    final android = _plugin
+        .resolvePlatformSpecificImplementation<
+          AndroidFlutterLocalNotificationsPlugin
+        >();
+    if (android == null) return;
+    try {
+      final can = await android.canScheduleExactNotifications();
+      if (can == true) return;
+      final prefs = await SharedPreferences.getInstance();
+      final nowMs = DateTime.now().millisecondsSinceEpoch;
+      if (!bypassThrottle) {
+        final last = prefs.getInt(_kExactAlarmPromptMs) ?? 0;
+        if (nowMs - last < throttle.inMilliseconds) return;
+      }
+      await prefs.setInt(_kExactAlarmPromptMs, nowMs);
+      await android.requestExactAlarmsPermission();
+    } catch (e) {
+      debugPrint('ensureAndroidExactAlarmAccess: $e');
+    }
+  }
+
+  /// After notification permission, call this so timeline nudges can use
+  /// precise alarm scheduling on Android.
+  static Future<void> prepareOsForScheduledNudges({
+    bool bypassExactAlarmThrottle = false,
+  }) async {
+    await requestOsNotificationPermission();
+    await ensureAndroidExactAlarmAccess(bypassThrottle: bypassExactAlarmThrottle);
+  }
+
+  /// [alarmClock] uses AlarmManager.setAlarmClock — on-time delivery and not
+  /// subject to the same Doze rate limits as [exactAllowWhileIdle].
+  /// Falls back to inexact only when the user has denied exact alarms.
   static Future<AndroidScheduleMode> resolveAndroidScheduleMode() async {
     if (!Platform.isAndroid) {
       return AndroidScheduleMode.exactAllowWhileIdle;
@@ -192,7 +238,7 @@ class NotificationBootstrap {
     }
     final exact = await android.canScheduleExactNotifications();
     if (exact == true) {
-      return AndroidScheduleMode.exactAllowWhileIdle;
+      return AndroidScheduleMode.alarmClock;
     }
     return AndroidScheduleMode.inexactAllowWhileIdle;
   }
