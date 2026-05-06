@@ -52,7 +52,12 @@ class DayStripSummary {
   }
 }
 
-/// Dot summaries for the week strip: **past-only** window (no +120d future work).
+DateTime _startOfWeek(DateTime d) {
+  final date = parseLocalYmd(formatLocalYmd(d));
+  return date.subtract(Duration(days: date.weekday - 1));
+}
+
+/// Dot summaries for the week strip: rolling multi-week window (past + upcoming).
 ///
 /// Loads a fixed back-span from SQLite once (matching [TimelineWeekStripVariantA]),
 /// then **patches only the selected day** when [timelineSlotsProvider] updates so
@@ -67,21 +72,28 @@ final dayStripSummariesProvider =
 
 class DayStripSummariesNotifier
     extends AsyncNotifier<Map<String, DayStripSummary>> {
-  /// Match max history in [TimelineWeekStripVariantA] (`_weekPageCount`×6 days to oldest chip).
-  static const _weekStripPages = 20;
-  static const _daysPerStripPage = 6;
-  static const _daysBack = _weekStripPages * _daysPerStripPage - 1;
+  /// Match [TimelineWeekStripVariantA] week window (41 pages, center=current week).
+  static const _weeksBack = 20;
+  static const _weeksForward = 20;
+  static const _daysPerWeek = 7;
 
-  /// SQLite + JSON decode for ~120 days on the UI isolate was skipping 100+ frames
-  /// on cold start. Load only 1 week first; [_mergeRemainingStripDays] fills the rest.
-  static const _initialStripDayCount = 7;
+  /// SQLite + JSON decode for large windows on UI isolate can skip frames.
+  /// Load the current neighborhood first, then lazily fill weeks as the strip moves.
+  static const _initialStripDayCount = 14;
 
-  Future<void> _mergeRemainingStripDays(
-    List<String> allKeys,
-    int startIndex,
-  ) async {
-    if (startIndex >= allKeys.length) return;
-    final keys = allKeys.sublist(startIndex);
+  final Set<String> _knownDayOns = <String>{};
+  final Set<String> _loadedDayOns = <String>{};
+  final Set<String> _loadingDayOns = <String>{};
+
+  Future<void> _loadDays(Iterable<String> dayOns) async {
+    final keys = dayOns
+        .where((key) => _knownDayOns.contains(key))
+        .where((key) => !_loadedDayOns.contains(key))
+        .where((key) => !_loadingDayOns.contains(key))
+        .toSet()
+        .toList();
+    if (keys.isEmpty) return;
+    _loadingDayOns.addAll(keys);
     try {
       await Future<void>.delayed(Duration.zero);
       final store = await ref.read(timelineLocalStoreProvider.future);
@@ -91,6 +103,8 @@ class DayStripSummariesNotifier
             const Duration(seconds: 12),
             onTimeout: () => const <String, List<TimelineSlotModel>>{},
           );
+      _loadingDayOns.removeAll(keys);
+      _loadedDayOns.addAll(keys);
       if (!ref.mounted) return;
       final cur = state.value;
       if (cur == null) return;
@@ -102,28 +116,14 @@ class DayStripSummariesNotifier
           ),
       };
       state = AsyncData({...cur, ...patch});
-    } catch (_) {}
+    } catch (_) {
+      _loadingDayOns.removeAll(keys);
+    }
   }
 
-  Future<void> _patchSelectedDayFromDb(String dayOn) async {
-    try {
-      final cur = state.value;
-      if (cur == null) return;
-      final store = await ref.read(timelineLocalStoreProvider.future);
-      final slots = await store
-          .readSlotsForDay(dayOn)
-          .timeout(
-            const Duration(seconds: 10),
-            onTimeout: () => const <TimelineSlotModel>[],
-          );
-      if (!ref.mounted) return;
-      final again = state.value;
-      if (again == null) return;
-      state = AsyncData({
-        ...again,
-        dayOn: DayStripSummary.fromSlots(dayOn, slots),
-      });
-    } catch (_) {}
+  void ensureDaysLoaded(Iterable<String> dayOns) {
+    if (state.value == null) return;
+    unawaited(_loadDays(dayOns));
   }
 
   @override
@@ -132,9 +132,7 @@ class DayStripSummariesNotifier
 
     ref.listen<String>(timelineDayOnProvider, (prev, next) {
       if (prev == next) return;
-      final cur = state.value;
-      if (cur == null) return;
-      unawaited(_patchSelectedDayFromDb(next));
+      ensureDaysLoaded([next]);
     });
 
     ref.listen<AsyncValue<List<TimelineSlotModel>>>(timelineSlotsProvider, (
@@ -145,6 +143,7 @@ class DayStripSummariesNotifier
         final cur = state.value;
         if (cur == null) return;
         final dayOn = ref.read(timelineDayOnProvider);
+        _loadedDayOns.add(dayOn);
         state = AsyncData({
           ...cur,
           dayOn: DayStripSummary.fromSlots(dayOn, slots),
@@ -154,13 +153,29 @@ class DayStripSummariesNotifier
 
     final store = await ref.watch(timelineLocalStoreProvider.future);
     final today = parseLocalYmd(todayLocalYmdString());
+    final start = _startOfWeek(
+      today,
+    ).subtract(const Duration(days: _weeksBack * _daysPerWeek));
+    final end = _startOfWeek(today).add(
+      const Duration(days: _weeksForward * _daysPerWeek + (_daysPerWeek - 1)),
+    );
     final allKeys = <String>[];
-    for (var i = 0; i <= _daysBack; i++) {
-      allKeys.add(formatLocalYmd(today.subtract(Duration(days: i))));
+    for (var d = start; !d.isAfter(end); d = d.add(const Duration(days: 1))) {
+      allKeys.add(formatLocalYmd(d));
     }
-
+    _knownDayOns
+      ..clear()
+      ..addAll(allKeys);
+    _loadedDayOns.clear();
+    _loadingDayOns.clear();
+    final todayKey = formatLocalYmd(today);
+    final todayIndex = allKeys.indexOf(todayKey);
     final initialLen = math.min(_initialStripDayCount, allKeys.length);
-    final initialKeys = allKeys.sublist(0, initialLen);
+    final initialStart = todayIndex < 0
+        ? 0
+        : math.max(0, todayIndex - (_initialStripDayCount ~/ 2));
+    final initialEnd = math.min(allKeys.length, initialStart + initialLen);
+    final initialKeys = allKeys.sublist(initialStart, initialEnd);
     final slotsByDay = await store
         .readSlotsForDays(initialKeys)
         .timeout(
@@ -178,14 +193,12 @@ class DayStripSummariesNotifier
         slotsByDay[key] ?? const <TimelineSlotModel>[],
       );
     }
-
-    if (initialLen < allKeys.length) {
-      unawaited(_mergeRemainingStripDays(allKeys, initialLen));
-    }
+    _loadedDayOns.addAll(initialKeys);
 
     final dayOn = ref.read(timelineDayOnProvider);
     final live = ref.read(timelineSlotsProvider);
     if (live.hasValue) {
+      _loadedDayOns.add(dayOn);
       map = {
         ...map,
         dayOn: DayStripSummary.fromSlots(dayOn, live.requireValue),

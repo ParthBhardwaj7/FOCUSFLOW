@@ -228,28 +228,54 @@ class FocusFlowClient {
   }
 
   Future<UserModel?> _cachedOrJwtBootstrapUser() async {
-    if (kDebugMode) debugPrint('[DEBUG] _cachedOrJwtBootstrapUser: starting');
+    if (kDebugMode) {
+      debugPrint('[DEBUG] _cachedOrJwtBootstrapUser: starting');
+    }
     final sw = Stopwatch()..start();
-    
+
     final cached = await _readCachedUser();
-    if (kDebugMode) debugPrint('[DEBUG] _cachedOrJwtBootstrapUser: _readCachedUser (${cached != null ? "found" : "null"}): ${sw.elapsedMilliseconds}ms');
-    
-    if (cached != null) return cached;
-    
-    if (kDebugMode) debugPrint('[DEBUG] _cachedOrJwtBootstrapUser: reading access token');
+    if (kDebugMode) {
+      debugPrint(
+        '[DEBUG] _cachedOrJwtBootstrapUser: _readCachedUser (${cached != null ? "found" : "null"}): ${sw.elapsedMilliseconds}ms',
+      );
+    }
+
+    if (cached != null) {
+      return cached;
+    }
+
+    if (kDebugMode) {
+      debugPrint('[DEBUG] _cachedOrJwtBootstrapUser: reading access token');
+    }
     final accessToken = await _storage.read(key: _kAccess);
-    if (kDebugMode) debugPrint('[DEBUG] _cachedOrJwtBootstrapUser: access token read: ${sw.elapsedMilliseconds}ms');
-    
+    if (kDebugMode) {
+      debugPrint(
+        '[DEBUG] _cachedOrJwtBootstrapUser: access token read: ${sw.elapsedMilliseconds}ms',
+      );
+    }
+
     final boot = _userFromAccessTokenJwt(accessToken);
-    if (kDebugMode) debugPrint('[DEBUG] _cachedOrJwtBootstrapUser: JWT bootstrap (${boot != null ? "found" : "null"}): ${sw.elapsedMilliseconds}ms');
-    
+    if (kDebugMode) {
+      debugPrint(
+        '[DEBUG] _cachedOrJwtBootstrapUser: JWT bootstrap (${boot != null ? "found" : "null"}): ${sw.elapsedMilliseconds}ms',
+      );
+    }
+
     if (boot != null) {
       await _persistUserCache(boot);
-      if (kDebugMode) debugPrint('[DEBUG] _cachedOrJwtBootstrapUser: persisted cache: ${sw.elapsedMilliseconds}ms');
+      if (kDebugMode) {
+        debugPrint(
+          '[DEBUG] _cachedOrJwtBootstrapUser: persisted cache: ${sw.elapsedMilliseconds}ms',
+        );
+      }
       return boot;
     }
-    
-    if (kDebugMode) debugPrint('[DEBUG] _cachedOrJwtBootstrapUser: returning null: ${sw.elapsedMilliseconds}ms');
+
+    if (kDebugMode) {
+      debugPrint(
+        '[DEBUG] _cachedOrJwtBootstrapUser: returning null: ${sw.elapsedMilliseconds}ms',
+      );
+    }
     return null;
   }
 
@@ -257,7 +283,9 @@ class FocusFlowClient {
   /// network errors so offline-first use keeps the signed-in user.
   Future<_RefreshOutcome> _refreshSession({bool coldStart = false}) async {
     final r = await _storage.read(key: _kRefresh);
-    if (r == null || r.isEmpty) return _RefreshOutcome.revoked;
+    if (r == null || r.isEmpty) {
+      return _RefreshOutcome.revoked;
+    }
     try {
       final res = await _plain.post<Map<String, dynamic>>(
         '/v1/auth/refresh',
@@ -292,17 +320,35 @@ class FocusFlowClient {
   /// Restores the signed-in user from secure storage / JWT **before** blocking on
   /// `GET /v1/me`. When online, [SessionController] runs a silent `me()` refresh.
   Future<UserModel?> tryRestoreSession() async {
-    if (kDebugMode) debugPrint('[DEBUG] tryRestoreSession: reading refresh token from storage');
+    if (kDebugMode) {
+      debugPrint(
+        '[DEBUG] tryRestoreSession: reading refresh token from storage',
+      );
+    }
     final sw = Stopwatch()..start();
-    
-    final refresh = await _storage.read(key: _kRefresh);
-    if (kDebugMode) debugPrint('[DEBUG] tryRestoreSession: refresh token read (${refresh != null ? "found" : "null"}): ${sw.elapsedMilliseconds}ms');
-    
-    if (refresh == null || refresh.isEmpty) return null;
 
-    if (kDebugMode) debugPrint('[DEBUG] tryRestoreSession: calling _cachedOrJwtBootstrapUser');
+    final refresh = await _storage.read(key: _kRefresh);
+    if (kDebugMode) {
+      debugPrint(
+        '[DEBUG] tryRestoreSession: refresh token read (${refresh != null ? "found" : "null"}): ${sw.elapsedMilliseconds}ms',
+      );
+    }
+
+    if (refresh == null || refresh.isEmpty) {
+      return null;
+    }
+
+    if (kDebugMode) {
+      debugPrint(
+        '[DEBUG] tryRestoreSession: calling _cachedOrJwtBootstrapUser',
+      );
+    }
     final fastUser = await _cachedOrJwtBootstrapUser();
-    if (kDebugMode) debugPrint('[DEBUG] tryRestoreSession: _cachedOrJwtBootstrapUser returned (${fastUser != null ? "user" : "null"}): ${sw.elapsedMilliseconds}ms');
+    if (kDebugMode) {
+      debugPrint(
+        '[DEBUG] tryRestoreSession: _cachedOrJwtBootstrapUser returned (${fastUser != null ? "user" : "null"}): ${sw.elapsedMilliseconds}ms',
+      );
+    }
     if (fastUser != null) {
       return fastUser;
     }
@@ -311,9 +357,9 @@ class FocusFlowClient {
     // there is no data path, skip network entirely so the router can leave
     // splash immediately (login) instead of waiting on connection timeouts.
     try {
-      final net = await Connectivity()
-          .checkConnectivity()
-          .timeout(const Duration(seconds: 2));
+      final net = await Connectivity().checkConnectivity().timeout(
+        const Duration(seconds: 2),
+      );
       if (connectivityLooksOfflineOnly(net)) {
         if (kDebugMode) {
           debugPrint(
@@ -395,6 +441,24 @@ class FocusFlowClient {
     final user = UserModel.fromJson(res.data!['user'] as Map<String, dynamic>);
     await _persistUserCache(user);
     return user;
+  }
+
+  Future<void> requestPasswordResetCode(String email) async {
+    await _plain.post<Map<String, dynamic>>(
+      '/v1/auth/forgot-password/request',
+      data: {'email': email},
+    );
+  }
+
+  Future<void> resetPasswordWithCode({
+    required String email,
+    required String code,
+    required String newPassword,
+  }) async {
+    await _plain.post<Map<String, dynamic>>(
+      '/v1/auth/forgot-password/reset',
+      data: {'email': email, 'code': code, 'newPassword': newPassword},
+    );
   }
 
   Future<UserModel> loginWithGoogleTokens({
@@ -686,7 +750,7 @@ class FocusFlowClient {
         requestOptions: res.requestOptions,
         response: res,
         type: DioExceptionType.badResponse,
-        message: 'Empty response from server',
+        message: 'We could not finish saving that note. Please try again.',
       );
     }
     return NoteModel.fromJson(d);
@@ -703,7 +767,10 @@ class FocusFlowClient {
       'title': title,
       if (transcript.trim().isNotEmpty) 'transcript': transcript.trim(),
       'tags': tags,
-      'audio': await MultipartFile.fromFile(audioFilePath, filename: 'voice.m4a'),
+      'audio': await MultipartFile.fromFile(
+        audioFilePath,
+        filename: 'voice.m4a',
+      ),
     });
     final res = await _auth.post<Map<String, dynamic>>(
       '/v1/notes/voice',
@@ -716,7 +783,8 @@ class FocusFlowClient {
         requestOptions: res.requestOptions,
         response: res,
         type: DioExceptionType.badResponse,
-        message: 'Empty response from server',
+        message:
+            'We could not finish saving that voice note. Please try again.',
       );
     }
     return NoteModel.fromJson(d);
@@ -753,7 +821,7 @@ class FocusFlowClient {
         requestOptions: res.requestOptions,
         response: res,
         type: DioExceptionType.badResponse,
-        message: 'Empty response from server',
+        message: 'We could not finish saving that note. Please try again.',
       );
     }
     return NoteModel.fromJson(d);
@@ -917,7 +985,7 @@ class FocusFlowClient {
     final data = res.data;
     var url = data?['url'] as String?;
     if (url == null || url.trim().isEmpty) {
-      throw StateError('Server returned no recording url');
+      throw StateError('recording_upload_incomplete');
     }
     url = url.trim();
     if (!url.startsWith('http')) {

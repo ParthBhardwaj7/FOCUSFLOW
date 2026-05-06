@@ -21,7 +21,6 @@ import '../add_task/add_task_page.dart';
 import '../focus/deep_focus_prep_sheet.dart';
 import '../recovery/reset_day_sheet.dart';
 import '../settings/settings_providers.dart';
-import '../shell/main_shell_scaffold.dart';
 import '../shell/shell_tab_scope.dart';
 import 'timeline_focus_logic.dart';
 import 'timeline_providers.dart';
@@ -98,22 +97,13 @@ class _TimelineScreenState extends ConsumerState<TimelineScreen>
       final current = ref.read(timelineDayOnProvider);
       if (current != today) {
         ref.read(timelineDayOnProvider.notifier).selectDay(today);
-        ref.invalidate(timelineSlotsProvider);
-        ref.invalidate(dayStripSummariesProvider);
       }
     });
     _tick = Timer.periodic(const Duration(seconds: 60), (_) {
       if (!mounted) return;
-      final shellTab = ShellTabIndexScope.maybeOf(context);
       final before = ref.read(timelineDayOnProvider);
       ref.read(timelineDayOnProvider.notifier).syncWithClockIfFollowingToday();
-      if (before != ref.read(timelineDayOnProvider)) {
-        ref.invalidate(timelineSlotsProvider);
-        ref.invalidate(dayStripSummariesProvider);
-        if (shellTab == null || shellTab == kShellTabTimeline) {
-          setState(() {});
-        }
-      }
+      if (before == ref.read(timelineDayOnProvider)) return;
     });
   }
 
@@ -133,10 +123,7 @@ class _TimelineScreenState extends ConsumerState<TimelineScreen>
       ref.invalidate(osTimelineNotificationsEnabledProvider);
       final before = ref.read(timelineDayOnProvider);
       ref.read(timelineDayOnProvider.notifier).syncWithClockIfFollowingToday();
-      if (before != ref.read(timelineDayOnProvider)) {
-        ref.invalidate(timelineSlotsProvider);
-        ref.invalidate(dayStripSummariesProvider);
-      }
+      if (before == ref.read(timelineDayOnProvider)) return;
     }
   }
 
@@ -156,6 +143,20 @@ class _TimelineScreenState extends ConsumerState<TimelineScreen>
       enabled: timelineActive,
       child: Scaffold(
         backgroundColor: TimelineTokens.scaffoldBg(context),
+        floatingActionButtonLocation: FloatingActionButtonLocation.endFloat,
+        floatingActionButton: timelineActive
+            ? Padding(
+                padding: EdgeInsets.only(
+                  bottom: MediaQuery.paddingOf(context).bottom + 12,
+                ),
+                child: FloatingActionButton(
+                  backgroundColor: Theme.of(context).colorScheme.primary,
+                  foregroundColor: Theme.of(context).colorScheme.onPrimary,
+                  onPressed: () => _showFabMenu(context, ref, dayOn),
+                  child: const Icon(Icons.add, size: 28),
+                ),
+              )
+            : null,
         body: SafeArea(
           child: timelineActive
               ? slotsAsync.when(
@@ -206,16 +207,14 @@ class _TimelineScreenState extends ConsumerState<TimelineScreen>
     final daySlots =
         slots.where((s) => _slotStartsOnLocalDay(s, dayOn)).toList()
           ..sort((a, b) => a.startsAt.compareTo(b.startsAt));
+
     /// Next actionable within the visible day so highlights always match listed rows.
     final next = pickNextFocusSlot(daySlots);
 
     return LayoutBuilder(
       builder: (context, c) {
         final w = c.maxWidth.clamp(0.0, TimelineTokens.maxContentWidth);
-        final bottomInset =
-            MediaQuery.paddingOf(context).bottom +
-            kFocusFlowShellNavHeight +
-            72;
+        final bottomInset = MediaQuery.paddingOf(context).bottom + 92.0;
         return Stack(
           children: [
             Column(
@@ -233,9 +232,7 @@ class _TimelineScreenState extends ConsumerState<TimelineScreen>
                           final choice = await showResetDaySheet(context);
                           if (!context.mounted || choice == null) return;
                           ScaffoldMessenger.of(context).showSnackBar(
-                            SnackBar(
-                              content: Text('Reset: ${choice.name}'),
-                            ),
+                            SnackBar(content: Text('Reset: ${choice.name}')),
                           );
                         },
                       ),
@@ -247,20 +244,17 @@ class _TimelineScreenState extends ConsumerState<TimelineScreen>
                   child: Center(
                     child: SizedBox(
                       width: w,
-                      child: SingleChildScrollView(
-                        controller: _pageScroll,
-                        padding: EdgeInsets.fromLTRB(16, 0, 16, bottomInset),
+                      child: Padding(
+                        padding: const EdgeInsets.symmetric(horizontal: 16),
                         child: _TimelineBody(
+                          scrollController: _pageScroll,
+                          bottomPadding: bottomInset,
                           dayOn: dayOn,
                           slots: daySlots,
                           now: now,
                           nextSlotId: next?.id,
-                          onSlotTap: (slot) => _showSlotActionSheet(
-                            context,
-                            ref,
-                            dayOn,
-                            slot,
-                          ),
+                          onSlotTap: (slot) =>
+                              _showSlotActionSheet(context, ref, dayOn, slot),
                           onStartFocus: (slot) =>
                               _startFocus(context, ref, slot),
                           onMarkDone: (slot) =>
@@ -275,19 +269,6 @@ class _TimelineScreenState extends ConsumerState<TimelineScreen>
                   ),
                 ),
               ],
-            ),
-            Positioned(
-              right: 16,
-              bottom:
-                  MediaQuery.paddingOf(context).bottom +
-                  kFocusFlowShellNavHeight +
-                  12,
-              child: FloatingActionButton(
-                backgroundColor: Theme.of(context).colorScheme.primary,
-                foregroundColor: Theme.of(context).colorScheme.onPrimary,
-                onPressed: () => _showFabMenu(context, ref, dayOn),
-                child: const Icon(Icons.add, size: 28),
-              ),
             ),
           ],
         );
@@ -305,56 +286,53 @@ class _TimelineScreenState extends ConsumerState<TimelineScreen>
       builder: (ctx) {
         final cs = Theme.of(ctx).colorScheme;
         return SafeArea(
-        child: Padding(
-          padding: const EdgeInsets.fromLTRB(16, 12, 16, 16),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              ListTile(
-                leading: Icon(Icons.add_task, color: cs.onSurface),
-                title: Text(
-                  'Add task',
-                  style: TextStyle(
-                    color: cs.onSurface,
-                    fontWeight: FontWeight.w600,
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(16, 12, 16, 16),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                ListTile(
+                  leading: Icon(Icons.add_task, color: cs.onSurface),
+                  title: Text(
+                    'Add task',
+                    style: TextStyle(
+                      color: cs.onSurface,
+                      fontWeight: FontWeight.w600,
+                    ),
                   ),
+                  onTap: () {
+                    Navigator.pop(ctx);
+                    context.push(
+                      '/add-task',
+                      extra: AddTaskRouteArgs(initialDate: dayOn),
+                    );
+                  },
                 ),
-                onTap: () {
-                  Navigator.pop(ctx);
-                  context.push(
-                    '/add-task',
-                    extra: AddTaskRouteArgs(initialDate: dayOn),
-                  );
-                },
-              ),
-              ListTile(
-                leading: Icon(Icons.bolt, color: cs.onSurface),
-                title: Text(
-                  'Unplanned task',
-                  style: TextStyle(
-                    color: cs.onSurface,
-                    fontWeight: FontWeight.w600,
+                ListTile(
+                  leading: Icon(Icons.bolt, color: cs.onSurface),
+                  title: Text(
+                    'Unplanned task',
+                    style: TextStyle(
+                      color: cs.onSurface,
+                      fontWeight: FontWeight.w600,
+                    ),
                   ),
-                ),
-                subtitle: Text(
-                  'Quick add for this day',
-                  style: TextStyle(
-                    color: cs.onSurfaceVariant,
-                    fontSize: 12,
+                  subtitle: Text(
+                    'Quick add for this day',
+                    style: TextStyle(color: cs.onSurfaceVariant, fontSize: 12),
                   ),
+                  onTap: () {
+                    Navigator.pop(ctx);
+                    context.push(
+                      '/add-task',
+                      extra: AddTaskRouteArgs(initialDate: dayOn),
+                    );
+                  },
                 ),
-                onTap: () {
-                  Navigator.pop(ctx);
-                  context.push(
-                    '/add-task',
-                    extra: AddTaskRouteArgs(initialDate: dayOn),
-                  );
-                },
-              ),
-            ],
+              ],
+            ),
           ),
-        ),
         );
       },
     );
@@ -420,131 +398,116 @@ class _TimelineScreenState extends ConsumerState<TimelineScreen>
         final onSurface = cs.onSurface;
         final onVar = cs.onSurfaceVariant;
         return SafeArea(
-        child: Padding(
-          padding: const EdgeInsets.fromLTRB(8, 8, 8, 16),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              Padding(
-                padding: const EdgeInsets.fromLTRB(16, 8, 16, 12),
-                child: Text(
-                  _displayTitle(slot.title),
-                  style: TextStyle(
-                    color: onSurface,
-                    fontSize: 17,
-                    fontWeight: FontWeight.w800,
-                  ),
-                ),
-              ),
-              if (!slot.isDone && slot.status != 'SKIPPED')
-                ListTile(
-                  leading: const Icon(
-                    Icons.play_arrow,
-                    color: TimelineTokens.green,
-                  ),
-                  title: Text(
-                    'Start',
-                    style: TextStyle(color: onSurface),
-                  ),
-                  onTap: () {
-                    Navigator.pop(ctx);
-                    _startFocus(context, ref, slot);
-                  },
-                ),
-              if (!slot.isDone && slot.status != 'SKIPPED')
-                ListTile(
-                  leading: Icon(
-                    Icons.skip_next,
-                    color: onVar,
-                  ),
-                  title: Text(
-                    'Skip',
-                    style: TextStyle(color: onSurface),
-                  ),
-                  onTap: () => _skipSlot(context, ref, slot),
-                ),
-              if (!slot.isDone)
-                ListTile(
-                  leading: const Icon(
-                    Icons.check_circle_outline,
-                    color: TimelineTokens.green,
-                  ),
-                  title: Text(
-                    'Mark done',
-                    style: TextStyle(color: onSurface),
-                  ),
-                  onTap: () {
-                    Navigator.pop(ctx);
-                    _markSlotDone(context, ref, slot);
-                  },
-                ),
-              if (slot.isDone)
-                ListTile(
-                  leading: Icon(
-                    Icons.undo_rounded,
-                    color: cs.primary.withValues(alpha: 0.95),
-                  ),
-                  title: Text(
-                    'Mark not done',
-                    style: TextStyle(color: onSurface),
-                  ),
-                  subtitle: Text(
-                    'Put this block back on your timeline',
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(8, 8, 8, 16),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(16, 8, 16, 12),
+                  child: Text(
+                    _displayTitle(slot.title),
                     style: TextStyle(
-                      color: onVar.withValues(alpha: 0.95),
+                      color: onSurface,
+                      fontSize: 17,
+                      fontWeight: FontWeight.w800,
+                    ),
+                  ),
+                ),
+                if (!slot.isDone && slot.status != 'SKIPPED')
+                  ListTile(
+                    leading: const Icon(
+                      Icons.play_arrow,
+                      color: TimelineTokens.green,
+                    ),
+                    title: Text('Start', style: TextStyle(color: onSurface)),
+                    onTap: () {
+                      Navigator.pop(ctx);
+                      _startFocus(context, ref, slot);
+                    },
+                  ),
+                if (!slot.isDone && slot.status != 'SKIPPED')
+                  ListTile(
+                    leading: Icon(Icons.skip_next, color: onVar),
+                    title: Text('Skip', style: TextStyle(color: onSurface)),
+                    onTap: () => _skipSlot(context, ref, slot),
+                  ),
+                if (!slot.isDone)
+                  ListTile(
+                    leading: const Icon(
+                      Icons.check_circle_outline,
+                      color: TimelineTokens.green,
+                    ),
+                    title: Text(
+                      'Mark done',
+                      style: TextStyle(color: onSurface),
+                    ),
+                    onTap: () {
+                      Navigator.pop(ctx);
+                      _markSlotDone(context, ref, slot);
+                    },
+                  ),
+                if (slot.isDone)
+                  ListTile(
+                    leading: Icon(
+                      Icons.undo_rounded,
+                      color: cs.primary.withValues(alpha: 0.95),
+                    ),
+                    title: Text(
+                      'Mark not done',
+                      style: TextStyle(color: onSurface),
+                    ),
+                    subtitle: Text(
+                      'Put this block back on your timeline',
+                      style: TextStyle(
+                        color: onVar.withValues(alpha: 0.95),
+                        fontSize: 12,
+                      ),
+                    ),
+                    onTap: () {
+                      Navigator.pop(ctx);
+                      _markSlotUndone(context, ref, slot);
+                    },
+                  ),
+                ListTile(
+                  leading: Icon(Icons.edit, color: onSurface),
+                  title: Text('Edit', style: TextStyle(color: onSurface)),
+                  onTap: () {
+                    Navigator.pop(ctx);
+                    context.push(
+                      '/add-task',
+                      extra: AddTaskRouteArgs(
+                        initialDate: dayOn,
+                        existingSlotId: slot.id,
+                      ),
+                    );
+                  },
+                ),
+                ListTile(
+                  leading: Icon(Icons.schedule, color: onSurface),
+                  title: Text('Move', style: TextStyle(color: onSurface)),
+                  subtitle: Text(
+                    'Change times on the next screen',
+                    style: TextStyle(
+                      color: onVar.withValues(alpha: 0.9),
                       fontSize: 12,
                     ),
                   ),
                   onTap: () {
                     Navigator.pop(ctx);
-                    _markSlotUndone(context, ref, slot);
+                    context.push(
+                      '/add-task',
+                      extra: AddTaskRouteArgs(
+                        initialDate: dayOn,
+                        existingSlotId: slot.id,
+                      ),
+                    );
                   },
                 ),
-              ListTile(
-                leading: Icon(Icons.edit, color: onSurface),
-                title: Text(
-                  'Edit',
-                  style: TextStyle(color: onSurface),
-                ),
-                onTap: () {
-                  Navigator.pop(ctx);
-                  context.push(
-                    '/add-task',
-                    extra: AddTaskRouteArgs(
-                      initialDate: dayOn,
-                      existingSlotId: slot.id,
-                    ),
-                  );
-                },
-              ),
-              ListTile(
-                leading: Icon(Icons.schedule, color: onSurface),
-                title: Text(
-                  'Move',
-                  style: TextStyle(color: onSurface),
-                ),
-                subtitle: Text(
-                  'Change times on the next screen',
-                  style: TextStyle(
-                    color: onVar.withValues(alpha: 0.9),
-                    fontSize: 12,
-                  ),
-                ),
-                onTap: () {
-                  Navigator.pop(ctx);
-                  context.push(
-                    '/add-task',
-                    extra: AddTaskRouteArgs(
-                      initialDate: dayOn,
-                      existingSlotId: slot.id,
-                    ),
-                  );
-                },
-              ),
-            ],
+              ],
+            ),
           ),
-        ),
         );
       },
     );
@@ -696,9 +659,9 @@ class _TimelineScreenState extends ConsumerState<TimelineScreen>
       ref.invalidate(timelineSlotsProvider);
       ref.invalidate(dayStripSummariesProvider);
       if (!context.mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Marked not done')),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text('Marked not done')));
     } catch (e) {
       if (!context.mounted) return;
       ScaffoldMessenger.of(
@@ -777,7 +740,6 @@ class _AppHeader extends ConsumerWidget {
   void _shiftWeek(WidgetRef ref, int deltaDays) {
     final d = parseLocalYmd(dayOn).add(Duration(days: deltaDays));
     ref.read(timelineDayOnProvider.notifier).selectDay(formatLocalYmd(d));
-    ref.invalidate(timelineSlotsProvider);
   }
 
   @override
@@ -821,10 +783,7 @@ class _AppHeader extends ConsumerWidget {
               ),
             ),
             PopupMenuButton<String>(
-              icon: Icon(
-                Icons.more_vert,
-                color: subColor,
-              ),
+              icon: Icon(Icons.more_vert, color: subColor),
               color: TimelineTokens.adaptiveSurfacePanel(context),
               onSelected: (v) async {
                 if (v == 'prev') {
@@ -846,7 +805,6 @@ class _AppHeader extends ConsumerWidget {
                   ref
                       .read(timelineDayOnProvider.notifier)
                       .selectDay(formatLocalYmd(picked));
-                  ref.invalidate(timelineSlotsProvider);
                   return;
                 }
                 if (v == 'reset') await onResetDay();
@@ -912,8 +870,16 @@ class _DeferredWeekStripState extends ConsumerState<_DeferredWeekStrip> {
   Widget _buildSkeleton(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
     final today = DateTime.now();
-    final weekday = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'][today.weekday - 1];
-    
+    final weekday = [
+      'Mon',
+      'Tue',
+      'Wed',
+      'Thu',
+      'Fri',
+      'Sat',
+      'Sun',
+    ][today.weekday - 1];
+
     return SizedBox(
       height: 72,
       child: Center(
@@ -1038,8 +1004,9 @@ class _UrgencyBar extends StatelessWidget {
                     Text(
                       '$slotTitle was due · start now or skip',
                       style: TextStyle(
-                        color: TimelineTokens.adaptiveSecondaryText(context)
-                            .withValues(alpha: 0.95),
+                        color: TimelineTokens.adaptiveSecondaryText(
+                          context,
+                        ).withValues(alpha: 0.95),
                         fontSize: 12,
                       ),
                     ),
@@ -1192,7 +1159,11 @@ class _TimeScaledDayTimeline extends StatelessWidget {
                   child: DecoratedBox(
                     decoration: BoxDecoration(
                       color: TimelineTokens.adaptiveCardPanel(context)
-                          .withValues(alpha: TimelineTokens.isLight(context) ? 0.65 : 0.35),
+                          .withValues(
+                            alpha: TimelineTokens.isLight(context)
+                                ? 0.65
+                                : 0.35,
+                          ),
                       border: Border.all(
                         color: TimelineTokens.adaptiveBorder(context),
                       ),
@@ -1219,16 +1190,13 @@ class _TimeScaledDayTimeline extends StatelessWidget {
                       builder: (context, child) {
                         final t = pulseAnimation.value;
                         final opacity = lerpDouble(0.45, 1.0, t)!;
-                        final primary =
-                            Theme.of(context).colorScheme.primary;
+                        final primary = Theme.of(context).colorScheme.primary;
                         return IgnorePointer(
                           child: Container(
                             height: 2,
                             decoration: BoxDecoration(
                               borderRadius: BorderRadius.circular(2),
-                              color: primary.withValues(
-                                alpha: opacity,
-                              ),
+                              color: primary.withValues(alpha: opacity),
                               boxShadow: [
                                 BoxShadow(
                                   color: primary.withValues(
@@ -1312,10 +1280,7 @@ class _TimeScaledDayTimeline extends StatelessWidget {
       border = TimelineTokens.stripRed.withValues(alpha: 0.55);
     } else if (isActive) {
       bg = light
-          ? Color.alphaBlend(
-              cs.primary.withValues(alpha: 0.14),
-              cs.surface,
-            )
+          ? Color.alphaBlend(cs.primary.withValues(alpha: 0.14), cs.surface)
           : cs.primary.withValues(alpha: 0.18);
       border = cs.primary;
     }
@@ -1353,8 +1318,9 @@ class _TimeScaledDayTimeline extends StatelessWidget {
                       style: TextStyle(
                         fontSize: 14,
                         fontWeight: FontWeight.w800,
-                        color: TimelineTokens.adaptivePrimaryText(context)
-                            .withValues(alpha: isDone ? 0.62 : 1),
+                        color: TimelineTokens.adaptivePrimaryText(
+                          context,
+                        ).withValues(alpha: isDone ? 0.62 : 1),
                       ),
                     ),
                   ),
@@ -1380,6 +1346,8 @@ class _TimeScaledDayTimeline extends StatelessWidget {
 
 class _TimelineBody extends StatelessWidget {
   const _TimelineBody({
+    required this.scrollController,
+    required this.bottomPadding,
     required this.dayOn,
     required this.slots,
     required this.now,
@@ -1390,6 +1358,8 @@ class _TimelineBody extends StatelessWidget {
     required this.onAdd,
   });
 
+  final ScrollController scrollController;
+  final double bottomPadding;
   final String dayOn;
   final List<TimelineSlotModel> slots;
   final DateTime now;
@@ -1401,29 +1371,35 @@ class _TimelineBody extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(2, 0, 0, 0),
-      child: Column(
-        children: [
-          if (slots.isEmpty)
-            _EmptyTimelineCard(dayOn: dayOn, onAdd: onAdd)
-          else
-            ...List.generate(slots.length, (index) {
-              final slot = slots[index];
-              return _TimelineRow(
-                slot: slot,
-                now: now,
-                isLast: index == slots.length - 1,
-                isNext: slot.id == nextSlotId,
-                onTap: () => onSlotTap(slot),
-                onStartFocus: () => onStartFocus(slot),
-                onMarkDone: () => onMarkDone(slot),
-                onRingTapWhenDone: () => onSlotTap(slot),
-              );
-            }),
-          _AddRow(onTap: onAdd),
-        ],
-      ),
+    final itemCount = (slots.isEmpty ? 1 : slots.length) + 1;
+    return ListView.builder(
+      controller: scrollController,
+      padding: EdgeInsets.only(left: 2, right: 0, bottom: bottomPadding),
+      itemCount: itemCount,
+      itemBuilder: (context, index) {
+        if (slots.isEmpty) {
+          if (index == 0) {
+            return _EmptyTimelineCard(dayOn: dayOn, onAdd: onAdd);
+          }
+          return _AddRow(onTap: onAdd);
+        }
+        if (index == slots.length) {
+          return _AddRow(onTap: onAdd);
+        }
+        final slot = slots[index];
+        return RepaintBoundary(
+          child: _TimelineRow(
+            slot: slot,
+            now: now,
+            isLast: index == slots.length - 1,
+            isNext: slot.id == nextSlotId,
+            onTap: () => onSlotTap(slot),
+            onStartFocus: () => onStartFocus(slot),
+            onMarkDone: () => onMarkDone(slot),
+            onRingTapWhenDone: () => onSlotTap(slot),
+          ),
+        );
+      },
     );
   }
 }
@@ -1459,21 +1435,13 @@ class _TimelineRow extends StatelessWidget {
     final isMissed = slot.isMissed;
 
     /// Wall-clock window (handles stale `status` vs real time).
-    final inWallClock =
-        !now.isBefore(startL) && now.isBefore(endL);
+    final inWallClock = !now.isBefore(startL) && now.isBefore(endL);
 
-    final inProgress =
-        !isDone &&
-        !_isSkipped &&
-        (slot.isActive || inWallClock);
+    final inProgress = !isDone && !_isSkipped && (slot.isActive || inWallClock);
 
     /// Next actionable slot in the queue, still before its start time.
     final upNext =
-        !isDone &&
-        !_isSkipped &&
-        !inProgress &&
-        isNext &&
-        now.isBefore(startL);
+        !isDone && !_isSkipped && !inProgress && isNext && now.isBefore(startL);
 
     /// Planned end passed but slot not completed or marked missed (nudge user).
     final overdueLive =
@@ -1486,8 +1454,9 @@ class _TimelineRow extends StatelessWidget {
     final showStart = !isDone && !_isSkipped && (inProgress || isNext);
     final isMuted = isDone || _isSkipped;
 
-    final timeMuted = TimelineTokens.adaptiveSecondaryText(context)
-        .withValues(alpha: TimelineTokens.isLight(context) ? 0.88 : 0.78);
+    final timeMuted = TimelineTokens.adaptiveSecondaryText(
+      context,
+    ).withValues(alpha: TimelineTokens.isLight(context) ? 0.88 : 0.78);
     final timeHot = inProgress
         ? Theme.of(context).colorScheme.primary
         : upNext
@@ -1601,8 +1570,9 @@ class _TimelineNode extends StatelessWidget {
 
     Color borderColor = TimelineTokens.adaptiveBorder(context);
     Color bg = TimelineTokens.adaptiveSurfacePanel(context);
-    Color fg = TimelineTokens.adaptiveSecondaryText(context)
-        .withValues(alpha: isSkipped ? 0.45 : 0.9);
+    Color fg = TimelineTokens.adaptiveSecondaryText(
+      context,
+    ).withValues(alpha: isSkipped ? 0.45 : 0.9);
     List<BoxShadow>? shadows;
 
     if (isDone) {
@@ -1628,10 +1598,7 @@ class _TimelineNode extends StatelessWidget {
       bg = accent;
       fg = onAccent;
       shadows = [
-        BoxShadow(
-          color: accent.withValues(alpha: 0.55),
-          blurRadius: 20,
-        ),
+        BoxShadow(color: accent.withValues(alpha: 0.55), blurRadius: 20),
       ];
     } else if (upNext) {
       borderColor = TimelineTokens.green;
@@ -1652,7 +1619,10 @@ class _TimelineNode extends StatelessWidget {
       decoration: BoxDecoration(
         color: bg,
         shape: BoxShape.circle,
-        border: Border.all(color: borderColor, width: inProgress || upNext ? 2.5 : 2),
+        border: Border.all(
+          color: borderColor,
+          width: inProgress || upNext ? 2.5 : 2,
+        ),
         boxShadow: shadows,
       ),
       child: Text(
@@ -1706,8 +1676,9 @@ class _SpineLinePainter extends CustomPainter {
     final paint = Paint()
       ..strokeWidth = 2
       ..strokeCap = StrokeCap.round
-      ..color = (isDone ? TimelineTokens.green : idleColor)
-          .withValues(alpha: isDone ? 0.25 : 0.42);
+      ..color = (isDone ? TimelineTokens.green : idleColor).withValues(
+        alpha: isDone ? 0.25 : 0.42,
+      );
     if (isDone) {
       canvas.drawLine(
         Offset(size.width / 2, 0),
@@ -1816,10 +1787,7 @@ class _TimelineCard extends StatelessWidget {
     } else if (inProgress) {
       borderColor = cs.primary;
       fill = light
-          ? Color.alphaBlend(
-              cs.primary.withValues(alpha: 0.12),
-              cs.surface,
-            )
+          ? Color.alphaBlend(cs.primary.withValues(alpha: 0.12), cs.surface)
           : cs.primary.withValues(alpha: 0.16);
       borderWidth = 2;
       shadows = [
@@ -1848,8 +1816,9 @@ class _TimelineCard extends StatelessWidget {
       ];
     }
 
-    final metaColor = TimelineTokens.adaptiveSecondaryText(context)
-        .withValues(alpha: 0.95);
+    final metaColor = TimelineTokens.adaptiveSecondaryText(
+      context,
+    ).withValues(alpha: 0.95);
     final metaHot = inProgress
         ? cs.primary
         : upNext
@@ -1941,8 +1910,9 @@ class _TimelineCard extends StatelessWidget {
                                     vertical: 2,
                                   ),
                                   decoration: BoxDecoration(
-                                    color: TimelineTokens.green
-                                        .withValues(alpha: 0.18),
+                                    color: TimelineTokens.green.withValues(
+                                      alpha: 0.18,
+                                    ),
                                     borderRadius: BorderRadius.circular(6),
                                   ),
                                   child: Text(
@@ -1988,8 +1958,9 @@ class _TimelineCard extends StatelessWidget {
                             maxLines: 2,
                             overflow: TextOverflow.ellipsis,
                             style: TextStyle(
-                              color: TimelineTokens.adaptivePrimaryText(context)
-                                  .withValues(alpha: isDone ? 0.72 : 1),
+                              color: TimelineTokens.adaptivePrimaryText(
+                                context,
+                              ).withValues(alpha: isDone ? 0.72 : 1),
                               fontSize: 15,
                               fontWeight: FontWeight.w800,
                               height: 1.18,
@@ -2121,11 +2092,7 @@ class _SoundLabel extends StatelessWidget {
     return Row(
       mainAxisSize: MainAxisSize.min,
       children: [
-        Icon(
-          Icons.music_note_rounded,
-          color: primary,
-          size: 12,
-        ),
+        Icon(Icons.music_note_rounded, color: primary, size: 12),
         const SizedBox(width: 3),
         Flexible(
           child: Text(
@@ -2257,8 +2224,9 @@ class _AddRow extends StatelessWidget {
                 color: Colors.transparent,
                 shape: BoxShape.circle,
                 border: Border.all(
-                  color: TimelineTokens.adaptiveSecondaryText(context)
-                      .withValues(alpha: 0.4),
+                  color: TimelineTokens.adaptiveSecondaryText(
+                    context,
+                  ).withValues(alpha: 0.4),
                   width: 1.5,
                 ),
               ),

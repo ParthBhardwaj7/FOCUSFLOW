@@ -4,6 +4,7 @@ import 'package:dio/dio.dart';
 import 'package:flutter/foundation.dart';
 
 import '../../../core/session/focusflow_client.dart';
+import '../../../core/user_facing_errors.dart';
 import '../domain/recording_model.dart';
 import 'local_storage.dart';
 
@@ -22,9 +23,10 @@ class RecordingUploadService {
     if (!await f.exists()) {
       await _store.update(
         rec.copyWith(
-          uploadError: 'Local file missing',
+          uploadError: 'This recording is no longer available on this device.',
           uploadFailCount: rec.uploadFailCount + 1,
-          permanentlyFailed: rec.uploadFailCount + 1 >= maxAttemptsBeforePermanent,
+          permanentlyFailed:
+              rec.uploadFailCount + 1 >= maxAttemptsBeforePermanent,
         ),
       );
       return;
@@ -49,7 +51,7 @@ class RecordingUploadService {
       final perm = next >= maxAttemptsBeforePermanent;
       await _store.update(
         rec.copyWith(
-          uploadError: e.message ?? e.toString(),
+          uploadError: userFacingError(e),
           uploadFailCount: next,
           permanentlyFailed: perm,
         ),
@@ -62,7 +64,7 @@ class RecordingUploadService {
       final perm = next >= maxAttemptsBeforePermanent;
       await _store.update(
         rec.copyWith(
-          uploadError: e.toString(),
+          uploadError: userFacingError(e),
           uploadFailCount: next,
           permanentlyFailed: perm,
         ),

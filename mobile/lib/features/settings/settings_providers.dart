@@ -5,7 +5,7 @@ import '../../core/models/productivity_day_model.dart';
 import '../../core/notification_settings_prefs.dart';
 import '../../core/timeline_local_provider.dart';
 
-final productivityProvider = FutureProvider.autoDispose
+final productivityProvider = FutureProvider
     .family<ProductivityPayload, int>((ref, range) async {
       final store = await ref.watch(timelineLocalStoreProvider.future);
       return store.productivityForRange(

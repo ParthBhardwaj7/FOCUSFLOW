@@ -10,27 +10,33 @@ import 'timeline_tokens.dart';
 
 DateTime _dateOnly(DateTime d) => DateTime(d.year, d.month, d.day);
 
-/// Rolling 6-day block: [page] 0 = days (today−5)…[today] left→right; page 1 = (today−11)…(today−6); etc.
-DateTime _newestDayOnPage(int page, DateTime today) {
-  return _dateOnly(today).subtract(Duration(days: page * 6));
+DateTime _startOfWeek(DateTime d) {
+  final date = _dateOnly(d);
+  return date.subtract(Duration(days: date.weekday - 1));
 }
 
 DateTime _chipDayOnPage(int page, int chipIndex, DateTime today) {
-  final newest = _newestDayOnPage(page, today);
-  return newest.subtract(Duration(days: 5 - chipIndex));
+  final weekStart = _weekStartOnPage(page, today);
+  return weekStart.add(Duration(days: chipIndex));
 }
 
-/// Which page contains [day] (local date), for paging the strip (0 = block ending today).
-int _pageForRollingStrip(DateTime day, DateTime today, int maxPageIndex) {
-  final d = _dateOnly(day);
-  final t = _dateOnly(today);
-  if (!d.isBefore(t)) return 0;
-  final diff = t.difference(d).inDays;
-  return (diff ~/ 6).clamp(0, maxPageIndex);
+DateTime _weekStartOnPage(int page, DateTime today) {
+  final offsetWeeks = page - _TimelineWeekStripVariantAState._originPage;
+  return _startOfWeek(today).add(Duration(days: offsetWeeks * 7));
 }
 
-/// Variant A from `Weeklystrip.html`: rolling 6-day windows ending on calendar **today**
-/// on page 0 (today rightmost); swipe left / chevron-left = older blocks. No future pages.
+/// Which page contains [day] (local date) in the paged week strip.
+int _pageForWeekStrip(DateTime day, DateTime today, int maxPageIndex) {
+  final start = _startOfWeek(_dateOnly(day));
+  final currentStart = _startOfWeek(_dateOnly(today));
+  final deltaDays = start.difference(currentStart).inDays;
+  final deltaWeeks = deltaDays ~/ 7;
+  final page = _TimelineWeekStripVariantAState._originPage + deltaWeeks;
+  return page.clamp(0, maxPageIndex);
+}
+
+/// Variant A from `Weeklystrip.html`: 7-day week windows (Mon..Sun).
+/// Page at [_originPage] = current week; left = older week; right = next week.
 ///
 /// **Day chip border / accent colours** (past = strictly before calendar [today]):
 /// - **Calendar today**: green border + soft green fill + glow.
@@ -52,46 +58,37 @@ class TimelineWeekStripVariantA extends ConsumerStatefulWidget {
 
 class _TimelineWeekStripVariantAState
     extends ConsumerState<TimelineWeekStripVariantA> {
-  static const int _weekPageCount = 20;
+  static const int _weekPageCount = 41;
+  static const int _originPage = 20;
   static const double _chipGap = 3;
-  static const double _navColWidth = 22;
+  static const double _navColWidth = 40;
+
   /// ~1.0 keeps **six** day chips on one row on typical phones; previously 1.7
   /// forced horizontal scroll (~4 visible). User-requested ~30% smaller feel.
   static const double _chipScale = 1.0;
 
   late final PageController _pageController;
-  final ScrollController _stripScroll = ScrollController();
   bool _suppressPageChanged = false;
   late int _surfacePage;
   bool _firstPaintDone = false;
   bool _consumedInitialPageCallback = false;
+  int? _lastPrefetchedPage;
 
   @override
   void initState() {
     super.initState();
-    // Spec: strip always loads with calendar today on the far right (page 0).
-    _surfacePage = 0;
-    _pageController = PageController(initialPage: 0);
+    // Spec: strip loads at current week in the middle page.
+    _surfacePage = _originPage;
+    _pageController = PageController(initialPage: _originPage);
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (mounted) setState(() => _firstPaintDone = true);
-      _syncStripScrollOffset();
     });
   }
 
   @override
   void dispose() {
     _pageController.dispose();
-    _stripScroll.dispose();
     super.dispose();
-  }
-
-  void _syncStripScrollOffset() {
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (!mounted || !_stripScroll.hasClients) return;
-      final max = _stripScroll.position.maxScrollExtent;
-      final target = _surfacePage == 0 ? max : 0.0;
-      _stripScroll.jumpTo(target.clamp(0.0, max));
-    });
   }
 
   @override
@@ -99,7 +96,7 @@ class _TimelineWeekStripVariantAState
     super.didUpdateWidget(oldWidget);
     if (oldWidget.dayOn == widget.dayOn) return;
     final today = _dateOnly(DateTime.now());
-    final target = _pageForRollingStrip(
+    final target = _pageForWeekStrip(
       parseLocalYmd(widget.dayOn),
       today,
       _weekPageCount - 1,
@@ -115,37 +112,52 @@ class _TimelineWeekStripVariantAState
       SchedulerBinding.instance.addPostFrameCallback((_) {
         if (mounted) _suppressPageChanged = false;
       });
-      _syncStripScrollOffset();
     });
   }
 
   void _onPageChanged(int page) {
     setState(() => _surfacePage = page);
-    _syncStripScrollOffset();
     if (_suppressPageChanged) return;
     if (!_firstPaintDone) return;
-    // Skip the first settle on page 0 so we do not overwrite timeline dayOn on load.
-    if (!_consumedInitialPageCallback && page == 0) {
+    // Skip initial settle so we do not overwrite timeline dayOn on first load.
+    if (!_consumedInitialPageCallback && page == _originPage) {
       _consumedInitialPageCallback = true;
       return;
     }
     _consumedInitialPageCallback = true;
     final today = _dateOnly(DateTime.now());
-    final anchor = _chipDayOnPage(page, 5, today);
+    final selected = parseLocalYmd(widget.dayOn);
+    final weekdayIndex = (selected.weekday - 1).clamp(0, 6);
+    final anchor = _chipDayOnPage(page, weekdayIndex, today);
     ref.read(timelineDayOnProvider.notifier).selectDay(formatLocalYmd(anchor));
-    ref.invalidate(timelineSlotsProvider);
   }
 
   Future<void> _goPage(int delta) async {
     if (!_pageController.hasClients) return;
-    final cur = _pageController.page?.round() ?? 0;
-    final next = (cur + delta).clamp(0, _weekPageCount - 1);
-    if (next == cur) return;
+    final next = (_surfacePage + delta).clamp(0, _weekPageCount - 1);
+    if (next == _surfacePage) return;
     await _pageController.animateToPage(
       next,
       duration: const Duration(milliseconds: 280),
       curve: Curves.easeOutCubic,
     );
+  }
+
+  void _schedulePreloadAround(int centerPage) {
+    if (_lastPrefetchedPage == centerPage) return;
+    _lastPrefetchedPage = centerPage;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      final today = _dateOnly(DateTime.now());
+      final keys = <String>{};
+      for (var page = centerPage - 1; page <= centerPage + 1; page++) {
+        if (page < 0 || page >= _weekPageCount) continue;
+        for (var chipIndex = 0; chipIndex < 7; chipIndex++) {
+          keys.add(formatLocalYmd(_chipDayOnPage(page, chipIndex, today)));
+        }
+      }
+      ref.read(dayStripSummariesProvider.notifier).ensureDaysLoaded(keys);
+    });
   }
 
   @override
@@ -155,15 +167,14 @@ class _TimelineWeekStripVariantAState
     return LayoutBuilder(
       builder: (context, constraints) {
         final maxW = constraints.maxWidth;
-        final gapsTotal = _chipGap * 5;
-        final inner =
-            (maxW - 2 * _navColWidth).clamp(0.0, double.infinity);
-        final baseChip =
-            inner > 0 && maxW.isFinite ? (inner - gapsTotal) / 6 : 56.0;
-        final scaledChip = (baseChip * _chipScale).clamp(48.0, 96.0);
-        final totalScaled = 6 * scaledChip + gapsTotal;
-        final useHScroll = totalScaled > inner + 0.5;
-        final chipW = useHScroll ? scaledChip : baseChip;
+        final gapsTotal = _chipGap * 6;
+        final inner = (maxW - 2 * _navColWidth).clamp(0.0, double.infinity);
+        final baseChip = inner > 0 && maxW.isFinite
+            ? (inner - gapsTotal) / 7
+            : 56.0;
+        // Keep a single rendering path (no nested horizontal scroll view) for
+        // smoother gesture performance on lower-end devices.
+        final chipW = (baseChip * _chipScale).clamp(42.0, 96.0);
         final stripH = chipW;
 
         if (!summariesAsync.hasValue) {
@@ -188,6 +199,7 @@ class _TimelineWeekStripVariantAState
         final map = summariesAsync.requireValue;
         final today = _dateOnly(DateTime.now());
         final maxPage = _weekPageCount - 1;
+        _schedulePreloadAround(_surfacePage);
 
         return SizedBox(
           height: stripH,
@@ -197,24 +209,24 @@ class _TimelineWeekStripVariantAState
               _WeekNavArrow(
                 width: _navColWidth,
                 icon: Icons.chevron_left_rounded,
-                onPressed: () => _goPage(1),
-                enabled: _surfacePage < maxPage,
+                semanticLabel: 'Previous week',
+                onPressed: () => _goPage(-1),
+                enabled: _surfacePage > 0,
               ),
               Expanded(
                 child: PageView.builder(
                   controller: _pageController,
-                  physics: useHScroll
-                      ? const NeverScrollableScrollPhysics()
-                      : const PageScrollPhysics(),
+                  physics: const PageScrollPhysics(),
                   onPageChanged: _onPageChanged,
                   itemCount: _weekPageCount,
                   itemBuilder: (context, page) {
                     final days = List.generate(
-                      6,
+                      7,
                       (i) => _chipDayOnPage(page, i, today),
                     );
                     List<Widget> chipAt(int i) {
-                      final summary = map[formatLocalYmd(days[i])] ??
+                      final summary =
+                          map[formatLocalYmd(days[i])] ??
                           const DayStripSummary(
                             dayOn: '',
                             done: 0,
@@ -224,7 +236,6 @@ class _TimelineWeekStripVariantAState
                       void onChipTap() {
                         final key = formatLocalYmd(days[i]);
                         ref.read(timelineDayOnProvider.notifier).selectDay(key);
-                        ref.invalidate(timelineSlotsProvider);
                       }
 
                       final chip = _WeekStripDayChipVariantA(
@@ -237,38 +248,14 @@ class _TimelineWeekStripVariantAState
                       );
                       return [
                         if (i > 0) SizedBox(width: _chipGap),
-                        if (useHScroll)
-                          RepaintBoundary(
-                            child: SizedBox(
-                              width: chipW,
-                              height: chipW,
-                              child: chip,
-                            ),
-                          )
-                        else
-                          Expanded(
-                            child: RepaintBoundary(child: chip),
-                          ),
+                        Expanded(child: RepaintBoundary(child: chip)),
                       ];
                     }
 
                     final rowChildren = <Widget>[
-                      for (var i = 0; i < 6; i++) ...chipAt(i),
+                      for (var i = 0; i < 7; i++) ...chipAt(i),
                     ];
 
-                    if (useHScroll) {
-                      return SingleChildScrollView(
-                        controller: page == _surfacePage
-                            ? _stripScroll
-                            : null,
-                        scrollDirection: Axis.horizontal,
-                        physics: const ClampingScrollPhysics(),
-                        child: Row(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: rowChildren,
-                        ),
-                      );
-                    }
                     return Row(
                       crossAxisAlignment: CrossAxisAlignment.stretch,
                       children: rowChildren,
@@ -279,8 +266,9 @@ class _TimelineWeekStripVariantAState
               _WeekNavArrow(
                 width: _navColWidth,
                 icon: Icons.chevron_right_rounded,
-                onPressed: () => _goPage(-1),
-                enabled: _surfacePage > 0,
+                semanticLabel: 'Next week',
+                onPressed: () => _goPage(1),
+                enabled: _surfacePage < maxPage,
               ),
             ],
           ),
@@ -294,12 +282,14 @@ class _WeekNavArrow extends StatelessWidget {
   const _WeekNavArrow({
     required this.width,
     required this.icon,
+    required this.semanticLabel,
     required this.onPressed,
     required this.enabled,
   });
 
   final double width;
   final IconData icon;
+  final String semanticLabel;
   final VoidCallback onPressed;
   final bool enabled;
 
@@ -312,16 +302,27 @@ class _WeekNavArrow extends StatelessWidget {
     return SizedBox(
       width: width,
       child: Center(
-        child: IconButton(
-          padding: EdgeInsets.zero,
-          constraints: BoxConstraints.tightFor(width: width, height: width),
-          onPressed: enabled ? onPressed : null,
-          icon: Icon(icon, color: c, size: 22),
-          style: IconButton.styleFrom(
-            foregroundColor: c,
-            disabledForegroundColor: c.withValues(alpha: 0.15),
-            splashFactory: NoSplash.splashFactory,
-            overlayColor: Colors.transparent,
+        child: Semantics(
+          button: true,
+          label: semanticLabel,
+          child: Material(
+            color: Colors.transparent,
+            child: InkResponse(
+              radius: 24,
+              onTap: enabled ? onPressed : null,
+              containedInkWell: false,
+              child: SizedBox(
+                width: width,
+                height: width,
+                child: Center(
+                  child: Icon(
+                    icon,
+                    color: enabled ? c : c.withValues(alpha: 0.15),
+                    size: 24,
+                  ),
+                ),
+              ),
+            ),
           ),
         ),
       ),
@@ -366,8 +367,8 @@ class _WeekStripDayChipVariantA extends StatelessWidget {
 
     final dayLabel = isToday
         ? 'TODAY'
-        : const ['MON', 'TUE', 'WED', 'THU', 'FRI', 'SAT', 'SUN']
-            [day.weekday - 1];
+        : const ['MON', 'TUE', 'WED', 'THU', 'FRI', 'SAT', 'SUN'][day.weekday -
+              1];
 
     final outerToday = isToday;
     final empty = !hasSlots;
@@ -396,6 +397,7 @@ class _WeekStripDayChipVariantA extends StatelessWidget {
     final partialA = light ? const Color(0xFFB45309) : y;
     final missedA = light ? cs.error : r;
 
+    final selectedAccent = cs.primary;
     final Color chipBorder;
     final List<BoxShadow>? chipShadow;
     final Color chipBg;
@@ -409,15 +411,21 @@ class _WeekStripDayChipVariantA extends StatelessWidget {
           offset: const Offset(0, 3),
         ),
       ];
+    } else if (isSelected) {
+      chipBorder = selectedAccent;
+      chipBg = selectedAccent.withValues(alpha: light ? 0.14 : 0.2);
+      chipShadow = [
+        BoxShadow(
+          color: selectedAccent.withValues(alpha: light ? 0.18 : 0.16),
+          blurRadius: 10,
+          offset: const Offset(0, 3),
+        ),
+      ];
     } else if (empty) {
       chipBorder = light
           ? cs.outline.withValues(alpha: 0.55)
           : TimelineTokens.stripTrack;
       chipBg = light ? cs.surface : TimelineTokens.weekStripCard;
-      chipShadow = null;
-    } else if (isSelected) {
-      chipBorder = todayA.withValues(alpha: light ? 0.55 : 0.45);
-      chipBg = light ? cs.surfaceContainerHigh : TimelineTokens.weekStripCard;
       chipShadow = null;
     } else if (isPast && hasSlots) {
       chipBg = light ? cs.surfaceContainerHigh : TimelineTokens.weekStripCard;
@@ -447,6 +455,8 @@ class _WeekStripDayChipVariantA extends StatelessWidget {
     final Color dayColor;
     if (outerToday) {
       dayColor = todayA;
+    } else if (isSelected) {
+      dayColor = selectedAccent;
     } else if (empty) {
       dayColor = light ? cs.onSurfaceVariant : TimelineTokens.stripSub;
     } else if (isPast) {
@@ -465,23 +475,32 @@ class _WeekStripDayChipVariantA extends StatelessWidget {
           break;
       }
     } else {
-      dayColor =
-          light ? cs.onSurfaceVariant.withValues(alpha: 0.85) : TimelineTokens.stripSub;
+      dayColor = light
+          ? cs.onSurfaceVariant.withValues(alpha: 0.85)
+          : TimelineTokens.stripSub;
     }
 
     final Color scoreBorder;
     final Color scoreBg;
     final Color scoreFg;
     if (empty) {
-      scoreBorder = light ? cs.outline.withValues(alpha: 0.5) : TimelineTokens.stripTrack;
+      scoreBorder = light
+          ? cs.outline.withValues(alpha: 0.5)
+          : TimelineTokens.stripTrack;
       scoreBg = Colors.transparent;
       scoreFg = light ? cs.onSurfaceVariant : TimelineTokens.stripTrack;
     } else if (outerToday) {
       scoreBorder = todayA;
       scoreBg = todayA.withValues(alpha: light ? 0.08 : 0.10);
       scoreFg = todayA;
+    } else if (isSelected) {
+      scoreBorder = selectedAccent.withValues(alpha: 0.9);
+      scoreBg = selectedAccent.withValues(alpha: light ? 0.08 : 0.15);
+      scoreFg = selectedAccent;
     } else if (isFuture) {
-      scoreBorder = light ? cs.outline.withValues(alpha: 0.5) : TimelineTokens.weekStripBorder2;
+      scoreBorder = light
+          ? cs.outline.withValues(alpha: 0.5)
+          : TimelineTokens.weekStripBorder2;
       scoreBg = light ? cs.surface : TimelineTokens.weekStripCard2;
       scoreFg = light ? cs.onSurfaceVariant : TimelineTokens.stripSub;
     } else {
@@ -574,8 +593,9 @@ class _WeekStripDayChipVariantA extends StatelessWidget {
                       style: TextStyle(
                         fontFamily: 'monospace',
                         fontSize: dayFs,
-                        fontWeight:
-                            outerToday ? FontWeight.w700 : FontWeight.w500,
+                        fontWeight: outerToday
+                            ? FontWeight.w700
+                            : FontWeight.w500,
                         letterSpacing: 0.6,
                         height: 1,
                         color: dayColor,
@@ -608,10 +628,7 @@ class _WeekStripDayChipVariantA extends StatelessWidget {
                                   textAlign: TextAlign.center,
                                   style: TextStyle(
                                     fontFamily: 'monospace',
-                                    fontSize: math.min(
-                                      scoreFs,
-                                      side * 0.32,
-                                    ),
+                                    fontSize: math.min(scoreFs, side * 0.32),
                                     fontWeight: FontWeight.w600,
                                     letterSpacing: -0.3,
                                     height: 1,

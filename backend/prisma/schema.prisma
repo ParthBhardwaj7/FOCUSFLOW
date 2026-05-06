@@ -94,25 +94,40 @@ model User {
   deviceOs              String?
   appVersion            String?
 
-  refreshTokens  RefreshToken[]
-  tasks          Task[]
-  focusSessions  FocusSession[]
-  timelineSlots  TimelineSlot[]
-  notes          Note[]
-  memories       UserMemory[]
-  plannerDays    PlannerDaySnapshot[]
+  refreshTokens     RefreshToken[]
+  passwordResetOtps PasswordResetOtp[]
+  tasks             Task[]
+  focusSessions     FocusSession[]
+  timelineSlots     TimelineSlot[]
+  notes             Note[]
+  memories          UserMemory[]
+  plannerDays       PlannerDaySnapshot[]
 
-  errorLogs        ErrorLog[]      @relation("UserErrors")
-  pushDevices      PushDevice[]
-  aiCoachLogs      AiCoachLog[]
-  auditLogs        AuditLog[]      @relation("AdminAuditActor")
-  resolvedErrors   ErrorLog[]      @relation("ErrorResolvedBy")
-  featureFlagUpdates FeatureFlag[] @relation("FeatureFlagUpdatedBy")
-  appConfigUpdates   AppConfig[]   @relation("AppConfigUpdatedBy")
+  errorLogs                ErrorLog[]         @relation("UserErrors")
+  pushDevices              PushDevice[]
+  aiCoachLogs              AiCoachLog[]
+  auditLogs                AuditLog[]         @relation("AdminAuditActor")
+  resolvedErrors           ErrorLog[]         @relation("ErrorResolvedBy")
+  featureFlagUpdates       FeatureFlag[]      @relation("FeatureFlagUpdatedBy")
+  appConfigUpdates         AppConfig[]        @relation("AppConfigUpdatedBy")
   pushNotificationsCreated PushNotification[] @relation("PushNotificationCreator")
   aiSuggestionsCreated     AiSuggestion[]     @relation("AiSuggestionCreator")
   categoriesCreated        Category[]         @relation("CategoryCreatedBy")
   soundsCreated            Sound[]            @relation("SoundCreatedBy")
+}
+
+model PasswordResetOtp {
+  id        String    @id @default(cuid())
+  userId    String
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  codeHash  String
+  expiresAt DateTime
+  usedAt    DateTime?
+  attempts  Int       @default(0)
+  createdAt DateTime  @default(now())
+
+  @@index([userId, createdAt])
+  @@index([expiresAt])
 }
 
 /// Offline-first planner mirror: one JSON blob per calendar day (survives app reinstall until account delete).
@@ -129,56 +144,56 @@ model PlannerDaySnapshot {
 }
 
 model TimelineSlot {
-  id           String              @id @default(cuid())
+  id           String             @id @default(cuid())
   userId       String
-  user         User                @relation(fields: [userId], references: [id], onDelete: Cascade)
+  user         User               @relation(fields: [userId], references: [id], onDelete: Cascade)
   startsAt     DateTime
   endsAt       DateTime
   title        String
   iconKey      String?
   tag          String?
   soundLabel   String?
-  status       TimelineSlotStatus  @default(UPCOMING)
+  status       TimelineSlotStatus @default(UPCOMING)
   linkedTaskId String?
-  task         Task?               @relation(fields: [linkedTaskId], references: [id], onDelete: SetNull)
-  sortOrder    Int                 @default(0)
-  createdAt    DateTime            @default(now())
-  updatedAt    DateTime            @updatedAt
+  task         Task?              @relation(fields: [linkedTaskId], references: [id], onDelete: SetNull)
+  sortOrder    Int                @default(0)
+  createdAt    DateTime           @default(now())
+  updatedAt    DateTime           @updatedAt
 
   @@index([userId, startsAt])
 }
 
 model RefreshToken {
-  id         String             @id @default(cuid())
+  id         String            @id @default(cuid())
   userId     String
-  user       User               @relation(fields: [userId], references: [id], onDelete: Cascade)
-  tokenHash  String             @unique
+  user       User              @relation(fields: [userId], references: [id], onDelete: Cascade)
+  tokenHash  String            @unique
   expiresAt  DateTime
-  createdAt  DateTime           @default(now())
+  createdAt  DateTime          @default(now())
   revokedAt  DateTime?
   replacedBy String?
-  scope      RefreshTokenScope  @default(USER)
+  scope      RefreshTokenScope @default(USER)
 
   @@index([userId])
 }
 
 model ErrorLog {
-  id            String                  @id @default(cuid())
-  userId        String?
-  user          User?                   @relation("UserErrors", fields: [userId], references: [id], onDelete: SetNull)
-  errorType     String
-  errorMessage  String                  @db.Text
-  screen        String?
-  appVersion    String?
-  deviceOs      String?
-  fingerprint   String
-  status        ErrorResolutionStatus   @default(UNRESOLVED)
-  internalNote  String?                 @db.Text
-  assignedTo    String?
-  resolvedById  String?
-  resolvedBy    User?                   @relation("ErrorResolvedBy", fields: [resolvedById], references: [id], onDelete: SetNull)
-  resolvedAt    DateTime?
-  createdAt     DateTime                @default(now())
+  id           String                @id @default(cuid())
+  userId       String?
+  user         User?                 @relation("UserErrors", fields: [userId], references: [id], onDelete: SetNull)
+  errorType    String
+  errorMessage String                @db.Text
+  screen       String?
+  appVersion   String?
+  deviceOs     String?
+  fingerprint  String
+  status       ErrorResolutionStatus @default(UNRESOLVED)
+  internalNote String?               @db.Text
+  assignedTo   String?
+  resolvedById String?
+  resolvedBy   User?                 @relation("ErrorResolvedBy", fields: [resolvedById], references: [id], onDelete: SetNull)
+  resolvedAt   DateTime?
+  createdAt    DateTime              @default(now())
 
   @@index([fingerprint, createdAt])
   @@index([userId, createdAt])
@@ -186,18 +201,18 @@ model ErrorLog {
 }
 
 model FeatureFlag {
-  id                   String    @id @default(cuid())
-  key                  String    @unique
-  isEnabled            Boolean   @default(false)
-  rolloutPercentage    Int       @default(0)
-  enabledForUserIds    String[]  @default([])
-  description          String?   @db.Text
-  scheduledEnableAt    DateTime?
-  scheduledDisableAt   DateTime?
-  updatedByUserId      String?
-  updatedBy            User?     @relation("FeatureFlagUpdatedBy", fields: [updatedByUserId], references: [id], onDelete: SetNull)
-  updatedAt            DateTime  @updatedAt
-  createdAt            DateTime  @default(now())
+  id                 String    @id @default(cuid())
+  key                String    @unique
+  isEnabled          Boolean   @default(false)
+  rolloutPercentage  Int       @default(0)
+  enabledForUserIds  String[]  @default([])
+  description        String?   @db.Text
+  scheduledEnableAt  DateTime?
+  scheduledDisableAt DateTime?
+  updatedByUserId    String?
+  updatedBy          User?     @relation("FeatureFlagUpdatedBy", fields: [updatedByUserId], references: [id], onDelete: SetNull)
+  updatedAt          DateTime  @updatedAt
+  createdAt          DateTime  @default(now())
 }
 
 model AppConfig {
@@ -239,25 +254,25 @@ model AdminFailedLogin {
 }
 
 model ErrorAlertConfig {
-  id                String   @id @default(cuid())
-  name              String   @unique
-  maxOccurrences    Int      @default(10)
-  windowMinutes     Int      @default(60)
-  slackWebhookUrl   String?
-  alertEmail        String?
-  scrubKeywords     Json?
-  isEnabled         Boolean  @default(true)
-  updatedAt         DateTime @updatedAt
+  id              String   @id @default(cuid())
+  name            String   @unique
+  maxOccurrences  Int      @default(10)
+  windowMinutes   Int      @default(60)
+  slackWebhookUrl String?
+  alertEmail      String?
+  scrubKeywords   Json?
+  isEnabled       Boolean  @default(true)
+  updatedAt       DateTime @updatedAt
 }
 
 model PushDevice {
-  id        String              @id @default(cuid())
+  id        String             @id @default(cuid())
   userId    String
-  user      User                @relation(fields: [userId], references: [id], onDelete: Cascade)
+  user      User               @relation(fields: [userId], references: [id], onDelete: Cascade)
   token     String
   platform  PushDevicePlatform
-  createdAt DateTime            @default(now())
-  updatedAt DateTime            @updatedAt
+  createdAt DateTime           @default(now())
+  updatedAt DateTime           @updatedAt
 
   @@unique([userId, token])
   @@index([userId])
@@ -280,36 +295,36 @@ model PushNotification {
 }
 
 model AiCoachLog {
-  id           String   @id @default(cuid())
-  userId       String
-  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-  messageUser  String   @db.Text
-  messageAi    String   @db.Text
-  tokensUsed   Int?
-  sessionId    String?
-  wasHelpful   Boolean?
-  createdAt    DateTime @default(now())
+  id          String   @id @default(cuid())
+  userId      String
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  messageUser String   @db.Text
+  messageAi   String   @db.Text
+  tokensUsed  Int?
+  sessionId   String?
+  wasHelpful  Boolean?
+  createdAt   DateTime @default(now())
 
   @@index([userId, createdAt])
 }
 
 model AiSuggestion {
-  id               String   @id @default(cuid())
-  title            String
-  subtitle         String   @db.Text
-  icon             String?
-  targetCondition  String
-  isActive         Boolean  @default(true)
-  shownCount       Int      @default(0)
-  dismissedCount   Int      @default(0)
-  clickCount       Int      @default(0)
-  variantParentId  String?
-  variantParent    AiSuggestion? @relation("AiSuggestionVariants", fields: [variantParentId], references: [id], onDelete: SetNull)
-  variants         AiSuggestion[] @relation("AiSuggestionVariants")
-  createdByUserId  String?
-  createdBy        User?    @relation("AiSuggestionCreator", fields: [createdByUserId], references: [id], onDelete: SetNull)
-  createdAt        DateTime @default(now())
-  updatedAt        DateTime @updatedAt
+  id              String         @id @default(cuid())
+  title           String
+  subtitle        String         @db.Text
+  icon            String?
+  targetCondition String
+  isActive        Boolean        @default(true)
+  shownCount      Int            @default(0)
+  dismissedCount  Int            @default(0)
+  clickCount      Int            @default(0)
+  variantParentId String?
+  variantParent   AiSuggestion?  @relation("AiSuggestionVariants", fields: [variantParentId], references: [id], onDelete: SetNull)
+  variants        AiSuggestion[] @relation("AiSuggestionVariants")
+  createdByUserId String?
+  createdBy       User?          @relation("AiSuggestionCreator", fields: [createdByUserId], references: [id], onDelete: SetNull)
+  createdAt       DateTime       @default(now())
+  updatedAt       DateTime       @updatedAt
 }
 
 model AiInsightTemplate {
@@ -339,19 +354,19 @@ model Category {
 }
 
 model Sound {
-  id               String    @id @default(cuid())
-  name             String
-  emoji            String?
-  fileUrl          String
-  durationSeconds  Int?
-  categoryTag      String?
-  isActive         Boolean   @default(true)
-  playCount        Int       @default(0)
-  deletedAt        DateTime?
-  createdByUserId  String?
-  createdBy        User?     @relation("SoundCreatedBy", fields: [createdByUserId], references: [id], onDelete: SetNull)
-  createdAt        DateTime  @default(now())
-  updatedAt        DateTime  @updatedAt
+  id              String    @id @default(cuid())
+  name            String
+  emoji           String?
+  fileUrl         String
+  durationSeconds Int?
+  categoryTag     String?
+  isActive        Boolean   @default(true)
+  playCount       Int       @default(0)
+  deletedAt       DateTime?
+  createdByUserId String?
+  createdBy       User?     @relation("SoundCreatedBy", fields: [createdByUserId], references: [id], onDelete: SetNull)
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
 
   categoriesDefault Category[]
 }
@@ -370,8 +385,8 @@ model Task {
   createdAt   DateTime  @default(now())
   updatedAt   DateTime  @updatedAt
 
-  focusSessions  FocusSession[]
-  timelineSlots  TimelineSlot[]
+  focusSessions FocusSession[]
+  timelineSlots TimelineSlot[]
 
   @@index([userId, scheduledOn])
 }
@@ -407,15 +422,15 @@ model UserMemory {
 }
 
 model FocusSession {
-  id                 String               @id @default(cuid())
+  id                 String              @id @default(cuid())
   userId             String
-  user               User                 @relation(fields: [userId], references: [id], onDelete: Cascade)
+  user               User                @relation(fields: [userId], references: [id], onDelete: Cascade)
   taskId             String?
-  task               Task?                @relation(fields: [taskId], references: [id], onDelete: SetNull)
-  startedAt          DateTime             @default(now())
+  task               Task?               @relation(fields: [taskId], references: [id], onDelete: SetNull)
+  startedAt          DateTime            @default(now())
   endedAt            DateTime?
   plannedDurationSec Int
-  outcome            FocusSessionOutcome  @default(PENDING)
+  outcome            FocusSessionOutcome @default(PENDING)
   subtasksSnapshot   Json?
 
   @@index([userId, startedAt])

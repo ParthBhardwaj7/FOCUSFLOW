@@ -69,8 +69,12 @@ class _InboxPageState extends ConsumerState<InboxPage>
   var _showReferenceLinkChip = false;
   var _showSplitLinesChip = false;
   Timer? _draftDebounce;
-  Timer? _quickUiDebounce;
   String? _pendingVoiceTempPath;
+  List<NoteModel>? _lastFilterInput;
+  String? _lastFilterTag;
+  _InboxSort? _lastFilterSort;
+  List<NoteModel>? _lastFilterOutput;
+  final Map<String, Set<String>> _tagsCache = <String, Set<String>>{};
 
   @override
   void initState() {
@@ -81,12 +85,21 @@ class _InboxPageState extends ConsumerState<InboxPage>
     _pulse = AnimationController(
       vsync: this,
       duration: const Duration(milliseconds: 1400),
-    )..repeat(reverse: true);
+    );
     _quick.addListener(_onQuickChanged);
     _restoreDraft();
   }
 
   void _onVoiceTick() {
+    final recording = _voice.voiceState == InboxVoiceState.recording;
+    if (recording) {
+      if (!_pulse.isAnimating) {
+        _pulse.repeat(reverse: true);
+      }
+    } else if (_pulse.isAnimating) {
+      _pulse.stop();
+      _pulse.value = 0;
+    }
     if (mounted) setState(() {});
   }
 
@@ -101,14 +114,7 @@ class _InboxPageState extends ConsumerState<InboxPage>
     _showReferenceLinkChip = urlChip;
     _showSplitLinesChip = splitChip;
     _debounceDraftSave();
-    if (chipsChanged) {
-      if (mounted) setState(() {});
-      return;
-    }
-    _quickUiDebounce?.cancel();
-    _quickUiDebounce = Timer(const Duration(milliseconds: 48), () {
-      if (mounted) setState(() {});
-    });
+    if (chipsChanged && mounted) setState(() {});
   }
 
   bool _looksLikeUrl(String s) {
@@ -158,7 +164,6 @@ class _InboxPageState extends ConsumerState<InboxPage>
   void dispose() {
     WidgetsBinding.instance.removeObserver(this);
     _draftDebounce?.cancel();
-    _quickUiDebounce?.cancel();
     for (final t in _deleteTimers.values) {
       t.cancel();
     }
@@ -185,12 +190,31 @@ class _InboxPageState extends ConsumerState<InboxPage>
 
   String _tagsCsv() => _selectedTags.join(',');
 
+  Set<String> _parsedTags(NoteModel note) {
+    final cacheKey = '${note.id}|${note.tags}';
+    return _tagsCache.putIfAbsent(
+      cacheKey,
+      () => note.tags
+          .split(',')
+          .map((e) => e.trim())
+          .where((e) => e.isNotEmpty)
+          .toSet(),
+    );
+  }
+
   List<NoteModel> _applyFilterAndSort(List<NoteModel> raw) {
+    if (identical(_lastFilterInput, raw) &&
+        _lastFilterTag == _filterTag &&
+        _lastFilterSort == _sort &&
+        _lastFilterOutput != null) {
+      return _lastFilterOutput!;
+    }
+
     var list = raw.toList();
     if (_filterTag.isNotEmpty) {
       list = list
           .where(
-            (n) => n.tags.split(',').map((e) => e.trim()).contains(_filterTag),
+            (n) => _parsedTags(n).contains(_filterTag),
           )
           .toList();
     }
@@ -202,7 +226,7 @@ class _InboxPageState extends ConsumerState<InboxPage>
         int score(NoteModel n) {
           var s = 0;
           if (n.pinned) s += 1000;
-          if (n.tags.split(',').map((e) => e.trim()).contains('Urgent')) {
+          if (_parsedTags(n).contains('Urgent')) {
             s += 100;
           }
           return s + n.createdAt.millisecondsSinceEpoch ~/ 1000000;
@@ -214,6 +238,10 @@ class _InboxPageState extends ConsumerState<InboxPage>
         list.sort((a, b) => a.tags.compareTo(b.tags));
         break;
     }
+    _lastFilterInput = raw;
+    _lastFilterTag = _filterTag;
+    _lastFilterSort = _sort;
+    _lastFilterOutput = list;
     return list;
   }
 
@@ -381,7 +409,7 @@ class _InboxPageState extends ConsumerState<InboxPage>
 
   Future<void> _showVoiceNoteSaveSheet() async {
     final temp = _pendingVoiceTempPath;
-    if (temp == null || !File(temp).existsSync()) {
+    if (temp == null || !await File(temp).exists()) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
@@ -396,11 +424,13 @@ class _InboxPageState extends ConsumerState<InboxPage>
     }
     final titleC = TextEditingController(text: 'Voice note ${_fmtClock()}');
     final notesC = TextEditingController();
+    if (!mounted) return;
+    final sheetBg = Theme.of(context).colorScheme.surface;
 
     await showModalBottomSheet<void>(
       context: context,
       isScrollControlled: true,
-      backgroundColor: Theme.of(context).colorScheme.surface,
+      backgroundColor: sheetBg,
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
       ),
@@ -493,12 +523,13 @@ class _InboxPageState extends ConsumerState<InboxPage>
                 children: [
                   Expanded(
                     child: OutlinedButton(
-                      onPressed: () {
+                      onPressed: () async {
                         try {
-                          File(temp).deleteSync();
+                          final file = File(temp);
+                          if (await file.exists()) await file.delete();
                         } catch (_) {}
                         _pendingVoiceTempPath = null;
-                        Navigator.pop(ctx);
+                        if (ctx.mounted) Navigator.pop(ctx);
                       },
                       child: const Text('Discard'),
                     ),
@@ -525,7 +556,8 @@ class _InboxPageState extends ConsumerState<InboxPage>
                           return;
                         }
                         try {
-                          File(temp).deleteSync();
+                          final file = File(temp);
+                          if (await file.exists()) await file.delete();
                         } catch (_) {}
 
                         final store = await ref.read(inboxLocalStoreProvider.future);
@@ -959,7 +991,8 @@ class _InboxPageState extends ConsumerState<InboxPage>
               final p = _pendingVoiceTempPath;
               if (p != null) {
                 try {
-                  File(p).deleteSync();
+                  final file = File(p);
+                  if (await file.exists()) await file.delete();
                 } catch (_) {}
                 _pendingVoiceTempPath = null;
               }
@@ -1013,7 +1046,8 @@ class _InboxPageState extends ConsumerState<InboxPage>
                     notes.where((n) => !_isVoiceNote(n)).length;
                 final hasVoiceNote = notes.any(_isVoiceNote);
                 final hints = InboxSmartHints.analyze(_quick.text);
-                final bottomInset = MediaQuery.of(context).viewInsets.bottom;
+                final keyboardInset = MediaQuery.of(context).viewInsets.bottom;
+                final safeBottom = MediaQuery.paddingOf(context).bottom;
 
                 return Consumer(
                   builder: (context, ref, _) {
@@ -1075,7 +1109,9 @@ class _InboxPageState extends ConsumerState<InboxPage>
                           await syncInboxOutbox(ref);
                         },
                         child: Padding(
-                          padding: EdgeInsets.only(bottom: bottomInset),
+                          // `Scaffold(resizeToAvoidBottomInset: true)` already handles keyboard
+                          // insets. Adding them again here caused a large white gap above keyboard.
+                          padding: EdgeInsets.zero,
                           child: CustomScrollView(
                             keyboardDismissBehavior:
                                 ScrollViewKeyboardDismissBehavior.onDrag,
@@ -1086,7 +1122,7 @@ class _InboxPageState extends ConsumerState<InboxPage>
                                   16,
                                   12,
                                   16,
-                                  8 + bottomInset * 0,
+                                  8,
                                 ),
                                 sliver: SliverToBoxAdapter(
                                   child: Row(
@@ -1725,7 +1761,9 @@ class _InboxPageState extends ConsumerState<InboxPage>
                                     16,
                                     8,
                                     16,
-                                    100 + bottomInset,
+                                    // Keep breathing room for bottom nav when keyboard is hidden,
+                                    // but avoid doubling keyboard inset which created blank space.
+                                    100 + (keyboardInset > 0 ? 0 : safeBottom),
                                   ),
                                   child: Column(
                                     crossAxisAlignment:

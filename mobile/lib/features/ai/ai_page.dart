@@ -100,6 +100,8 @@ class _AiPageState extends ConsumerState<AiPage> {
   /// When false, chat bubbles are collapsed to a single row (faster scroll to insights).
   var _chatPanelExpanded = true;
   var _historyHydrated = false;
+  int _performanceRange = 7;
+  final Map<int, ProductivityPayload> _productivityCache = {};
 
   @override
   void initState() {
@@ -478,10 +480,19 @@ class _AiPageState extends ConsumerState<AiPage> {
         ? ref.watch(timelineSlotsProvider)
         : const AsyncValue<List<TimelineSlotModel>>.data(<TimelineSlotModel>[]);
     final prodAsync = aiActive
-        ? ref.watch(productivityProvider(7))
+        ? ref.watch(productivityProvider(_performanceRange))
         : const AsyncValue<ProductivityPayload>.data(
             ProductivityPayload(timeZone: 'local', range: 7, days: []),
           );
+    ref.listen<AsyncValue<ProductivityPayload>>(
+      productivityProvider(_performanceRange),
+      (_, next) {
+        next.whenData((value) {
+          if (!mounted) return;
+          _productivityCache[_performanceRange] = value;
+        });
+      },
+    );
 
     final session = ref.watch(sessionProvider);
 
@@ -629,6 +640,7 @@ class _AiPageState extends ConsumerState<AiPage> {
                           const SizedBox(height: 12),
                           prodAsync.when(
                             data: (prod) {
+                              _productivityCache[_performanceRange] = prod;
                               final last = prod.days.isNotEmpty ? prod.days.last : null;
                               final streakHint = last != null && last.rate >= 60
                                   ? 'You are finishing ${last.rate.toStringAsFixed(0)}% of planned blocks recently.'
@@ -652,21 +664,111 @@ class _AiPageState extends ConsumerState<AiPage> {
                                   _SuggestionTile(
                                     icon: '🔋',
                                     title: streakHint,
-                                    subtitle: 'Based on your last 7 days in the local planner.',
+                                    subtitle:
+                                        'Based on your last $_performanceRange days in the local planner.',
                                   ),
                                   const SizedBox(height: 18),
-                                  _SectionLabel(text: 'Performance (7 days)'),
+                                  _SectionLabel(
+                                    text:
+                                        'Performance ($_performanceRange days)',
+                                  ),
+                                  const SizedBox(height: 8),
+                                  Wrap(
+                                    spacing: 8,
+                                    runSpacing: 8,
+                                    children: [7, 15, 30].map((range) {
+                                      final selected =
+                                          range == _performanceRange;
+                                      return ChoiceChip(
+                                        label: Text('$range days'),
+                                        selected: selected,
+                                        onSelected: (_) {
+                                          if (selected) return;
+                                          setState(
+                                            () => _performanceRange = range,
+                                          );
+                                        },
+                                      );
+                                    }).toList(),
+                                  ),
                                   const SizedBox(height: 8),
                                   PerformanceCoachChart(days: prod.days),
                                 ],
                               );
                             },
-                            loading: () => Padding(
-                              padding: const EdgeInsets.symmetric(vertical: 16),
-                              child: Center(
-                                child: CircularProgressIndicator(color: scheme.primary),
-                              ),
-                            ),
+                            loading: () {
+                              final cached = _productivityCache[_performanceRange];
+                              if (cached == null) {
+                                return Padding(
+                                  padding: const EdgeInsets.symmetric(vertical: 16),
+                                  child: Center(
+                                    child: CircularProgressIndicator(color: scheme.primary),
+                                  ),
+                                );
+                              }
+                              final last = cached.days.isNotEmpty ? cached.days.last : null;
+                              final streakHint = last != null && last.rate >= 60
+                                  ? 'You are finishing ${last.rate.toStringAsFixed(0)}% of planned blocks recently.'
+                                  : 'Pick one must-do block and protect it with a timer — execution beats replanning.';
+                              return Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  _SuggestionTile(
+                                    icon: '🧠',
+                                    title: 'Best deep work: morning first',
+                                    subtitle: upcoming > 2
+                                        ? '$upcoming upcoming blocks — tackle the hardest before noon.'
+                                        : 'Stack deep work before notifications ramp up.',
+                                  ),
+                                  _SuggestionTile(
+                                    icon: '🌧️',
+                                    title: 'Sound anchors focus',
+                                    subtitle:
+                                        'Rain or brown noise in Focus mode reduces context switching for study-shaped blocks.',
+                                  ),
+                                  _SuggestionTile(
+                                    icon: '🔋',
+                                    title: streakHint,
+                                    subtitle:
+                                        'Based on your last $_performanceRange days in the local planner.',
+                                  ),
+                                  const SizedBox(height: 18),
+                                  _SectionLabel(
+                                    text:
+                                        'Performance ($_performanceRange days)',
+                                  ),
+                                  const SizedBox(height: 8),
+                                  Wrap(
+                                    spacing: 8,
+                                    runSpacing: 8,
+                                    children: [7, 15, 30].map((range) {
+                                      final selected =
+                                          range == _performanceRange;
+                                      return ChoiceChip(
+                                        label: Text('$range days'),
+                                        selected: selected,
+                                        onSelected: (_) {
+                                          if (selected) return;
+                                          setState(
+                                            () => _performanceRange = range,
+                                          );
+                                        },
+                                      );
+                                    }).toList(),
+                                  ),
+                                  const SizedBox(height: 8),
+                                  Opacity(
+                                    opacity: 0.8,
+                                    child: PerformanceCoachChart(days: cached.days),
+                                  ),
+                                  const SizedBox(height: 8),
+                                  LinearProgressIndicator(
+                                    minHeight: 2,
+                                    color: scheme.primary,
+                                  ),
+                                ],
+                              );
+                            },
                             error: (e, _) => Padding(
                               padding: const EdgeInsets.only(top: 8),
                               child: Text(

@@ -1,7 +1,7 @@
 import {
-  ExceptionFilter,
-  Catch,
   ArgumentsHost,
+  Catch,
+  ExceptionFilter,
   HttpException,
   HttpStatus,
   Logger,
@@ -26,6 +26,7 @@ export class HttpExceptionFilter implements ExceptionFilter {
     const response = ctx.getResponse<Response>();
     const request = ctx.getRequest<Request>();
     const requestId = request.requestId ?? 'unknown';
+    const isProd = process.env.NODE_ENV === 'production';
 
     let status = HttpStatus.INTERNAL_SERVER_ERROR;
     let message: string | string[] = 'Internal server error';
@@ -44,12 +45,15 @@ export class HttpExceptionFilter implements ExceptionFilter {
         details = body.details;
       }
       code = this.normalizeCode(code, status);
+      if (isProd && status >= 500) {
+        message = this.genericMessageForStatus(status);
+        details = undefined;
+      }
     } else if (exception instanceof Error) {
       this.logger.error(
-        `${request.method} ${request.url} — ${exception.message}`,
+        `${request.method} ${request.url} - ${exception.message}`,
         exception.stack,
       );
-      const isProd = process.env.NODE_ENV === 'production';
       message = isProd ? 'Internal server error' : exception.message;
     } else {
       this.logger.error('Unknown exception', exception);
@@ -62,7 +66,7 @@ export class HttpExceptionFilter implements ExceptionFilter {
       path: request.url ?? '',
       requestId,
     };
-    if (details !== undefined) {
+    if (!isProd && details !== undefined) {
       body.details = details;
     }
 
@@ -86,5 +90,18 @@ export class HttpExceptionFilter implements ExceptionFilter {
       return code.replace(/\s+/g, '_').toUpperCase();
     }
     return this.codeFromStatus(status);
+  }
+
+  private genericMessageForStatus(status: number): string {
+    if (status === HttpStatus.SERVICE_UNAVAILABLE) {
+      return 'Service temporarily unavailable';
+    }
+    if (status === HttpStatus.BAD_GATEWAY) {
+      return 'Temporary upstream service issue';
+    }
+    if (status === HttpStatus.GATEWAY_TIMEOUT) {
+      return 'Request timed out';
+    }
+    return 'Internal server error';
   }
 }

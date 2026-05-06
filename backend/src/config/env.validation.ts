@@ -24,6 +24,16 @@ const envSchema = z.object({
   /** Parsed by `jsonwebtoken` / `expiryToMs` (suffix: ms|s|m|h|d). */
   JWT_ACCESS_EXPIRES_IN: z.string().default('365d'),
   JWT_REFRESH_EXPIRES_IN: z.string().default('36500d'),
+  PASSWORD_RESET_CODE_TTL_MINUTES: z.coerce.number().int().min(1).max(60).default(10),
+  SMTP_HOST: z.string().min(1).optional(),
+  SMTP_PORT: z.coerce.number().int().positive().optional(),
+  SMTP_USER: z.string().min(1).optional(),
+  SMTP_PASS: z.string().min(1).optional(),
+  SMTP_FROM_EMAIL: z.string().email().optional(),
+  SMTP_SECURE: z
+    .enum(['true', 'false'])
+    .optional()
+    .transform((v) => v === 'true'),
 
   CORS_ORIGINS: z
     .string()
@@ -81,6 +91,12 @@ function stripEmptyOptionalKeys(
     'REDIS_URL',
     'ADMIN_PANEL_URL',
     'SOUND_PUBLIC_BASE_URL',
+    'SMTP_HOST',
+    'SMTP_PORT',
+    'SMTP_USER',
+    'SMTP_PASS',
+    'SMTP_FROM_EMAIL',
+    'SMTP_SECURE',
   ]) {
     const v = out[key];
     if (typeof v === 'string' && v.trim() === '') {

@@ -25,34 +25,46 @@ export class AnalyticsService {
       today = DateTime.now().setZone('UTC').startOf('day');
     }
 
+    const firstDay = today.minus({ days: range - 1 });
+    const dayStart = parseYmdUtcStart(firstDay.toFormat('yyyy-MM-dd'));
+    const dayEnd = parseYmdUtcStart(today.plus({ days: 1 }).toFormat('yyyy-MM-dd'));
+    const tasks = await this.prisma.task.findMany({
+      where: {
+        userId,
+        archivedAt: null,
+        scheduledOn: {
+          gte: dayStart,
+          lt: dayEnd,
+        },
+      },
+      select: {
+        scheduledOn: true,
+        completedAt: true,
+      },
+    });
+
+    const counts = new Map<string, { planned: number; completed: number }>();
+    for (const t of tasks) {
+      const key = DateTime.fromJSDate(t.scheduledOn, { zone: 'utc' }).toFormat(
+        'yyyy-MM-dd',
+      );
+      const row = counts.get(key) ?? { planned: 0, completed: 0 };
+      row.planned += 1;
+      if (t.completedAt) row.completed += 1;
+      counts.set(key, row);
+    }
+
     const offsets = Array.from({ length: range }, (_, i) => range - 1 - i);
-    const dayRows = await Promise.all(
-      offsets.map(async (offset) => {
-        const d = today.minus({ days: offset });
-        const on = d.toFormat('yyyy-MM-dd');
-        const dayDate = parseYmdUtcStart(on);
-        const [planned, completed] = await Promise.all([
-          this.prisma.task.count({
-            where: {
-              userId,
-              scheduledOn: dayDate,
-              archivedAt: null,
-            },
-          }),
-          this.prisma.task.count({
-            where: {
-              userId,
-              scheduledOn: dayDate,
-              archivedAt: null,
-              completedAt: { not: null },
-            },
-          }),
-        ]);
-        const rate =
-          planned === 0 ? 0 : Math.round((completed / planned) * 1000) / 10;
-        return { date: on, planned, completed, rate };
-      }),
-    );
+    const dayRows = offsets.map((offset) => {
+      const d = today.minus({ days: offset });
+      const on = d.toFormat('yyyy-MM-dd');
+      const row = counts.get(on) ?? { planned: 0, completed: 0 };
+      const rate =
+        row.planned === 0
+          ? 0
+          : Math.round((row.completed / row.planned) * 1000) / 10;
+      return { date: on, planned: row.planned, completed: row.completed, rate };
+    });
 
     return { timeZone: zone, range, days: dayRows };
   }

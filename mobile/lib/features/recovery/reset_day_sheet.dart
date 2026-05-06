@@ -3,9 +3,10 @@ import 'package:flutter/material.dart';
 enum ResetDayChoice { compress, tomorrow, mitOnly }
 
 Future<ResetDayChoice?> showResetDaySheet(BuildContext context) {
+  final scheme = Theme.of(context).colorScheme;
   return showModalBottomSheet<ResetDayChoice>(
     context: context,
-    backgroundColor: const Color(0xFF16161F),
+    backgroundColor: scheme.surface,
     shape: const RoundedRectangleBorder(
       borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
     ),

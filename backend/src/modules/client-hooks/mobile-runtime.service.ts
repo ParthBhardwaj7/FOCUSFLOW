@@ -93,7 +93,9 @@ export class MobileRuntimeService {
     const sinceDay = new Date();
     sinceDay.setUTCHours(0, 0, 0, 0);
     const weekAgo = new Date(Date.now() - 7 * 86_400_000);
-    const [tasksToday, skippedWeek, user, last7] = await Promise.all([
+    const weekStart = new Date(Date.now() - 7 * 86_400_000);
+    const [tasksToday, skippedWeek, user, plannedWeek, completedWeek] =
+      await Promise.all([
       this.prisma.task.count({
         where: { userId, createdAt: { gte: sinceDay } },
       }),
@@ -108,19 +110,27 @@ export class MobileRuntimeService {
         where: { id: userId },
         select: { createdAt: true, plan: true },
       }),
-      this.prisma.task.findMany({
+      this.prisma.task.count({
         where: {
           userId,
           archivedAt: null,
           scheduledOn: {
-            gte: new Date(Date.now() - 7 * 86_400_000),
+            gte: weekStart,
+          },
+        },
+      }),
+      this.prisma.task.count({
+        where: {
+          userId,
+          archivedAt: null,
+          completedAt: { not: null },
+          scheduledOn: {
+            gte: weekStart,
           },
         },
       }),
     ]);
-    const planned = last7.length;
-    const completed = last7.filter((t) => t.completedAt).length;
-    const completionRate = planned === 0 ? 1 : completed / planned;
+    const completionRate = plannedWeek === 0 ? 1 : completedWeek / plannedWeek;
     const firstWeek =
       user && Date.now() - user.createdAt.getTime() < 7 * 86_400_000;
     return {

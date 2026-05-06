@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../../../../core/user_facing_errors.dart';
 import '../../domain/recording_model.dart';
 
 class RecordingListTile extends StatelessWidget {
@@ -42,13 +43,21 @@ class RecordingListTile extends StatelessWidget {
       syncColor = scheme.onSurfaceVariant;
     }
 
+    final uploadMessage = recording.uploadError == null
+        ? null
+        : sanitizeUserMessage(recording.uploadError);
+
     return ListTile(
       leading: Icon(syncIcon, color: syncColor),
-      title: Text(recording.fileName, maxLines: 1, overflow: TextOverflow.ellipsis),
+      title: Text(
+        recording.fileName,
+        maxLines: 1,
+        overflow: TextOverflow.ellipsis,
+      ),
       subtitle: Text(
         '${_fmt(recording.durationSeconds)} · ${_size(recording.fileSizeBytes)}'
-        '${recording.uploadError != null ? '\n${recording.uploadError}' : ''}',
-        maxLines: 2,
+        '${uploadMessage != null ? '\n$uploadMessage' : ''}',
+        maxLines: 3,
         overflow: TextOverflow.ellipsis,
         style: TextStyle(fontSize: 12, color: scheme.onSurfaceVariant),
       ),
@@ -61,7 +70,9 @@ class RecordingListTile extends StatelessWidget {
               onPressed: onPlay,
               icon: const Icon(Icons.play_circle_outline_rounded),
             ),
-          if (onUpload != null && !recording.isSynced && !recording.permanentlyFailed)
+          if (onUpload != null &&
+              !recording.isSynced &&
+              !recording.permanentlyFailed)
             IconButton(
               tooltip: 'Upload',
               onPressed: onUpload,

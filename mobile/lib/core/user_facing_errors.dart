@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:io';
 
 import 'package:dio/dio.dart';
@@ -10,6 +11,16 @@ import 'api_config.dart';
 bool isAuthLoginRequest(DioException e) {
   final p = e.requestOptions.path;
   return p.contains('/v1/auth/login') || p.contains('/v1/auth/register');
+}
+
+bool isGoogleAuthRequest(DioException e) {
+  return e.requestOptions.path.contains('/v1/auth/google');
+}
+
+bool isPasswordResetRequest(DioException e) {
+  final p = e.requestOptions.path;
+  return p.contains('/v1/auth/forgot-password/request') ||
+      p.contains('/v1/auth/forgot-password/reset');
 }
 
 /// Substrings that must never be shown verbatim to end users.
@@ -46,6 +57,12 @@ bool messageLooksLeakedOrTechnical(String message) {
     'STACK',
     'SQLITE',
     'DIOEXCEPTION',
+    'EMPTY RESPONSE',
+    'REQUESTOPTIONS',
+    'RESPONSE:',
+    'RECORDING URL',
+    'VOICE_FILE_',
+    'VOICE_NOT_',
     'BASEOPTIONS',
     'INTERNAL SERVER',
     'BAD GATEWAY',
@@ -70,16 +87,37 @@ String _sanitizeFreeform(String s) {
   return t;
 }
 
+String sanitizeUserMessage(String? message, {String? fallback}) {
+  final t = message?.trim() ?? '';
+  if (t.isEmpty) {
+    return fallback ?? 'Something went wrong. Please try again.';
+  }
+  if (_looksTechnical(t)) {
+    return fallback ?? 'Something went wrong. Please try again.';
+  }
+  return t;
+}
+
 /// Single entry point for SnackBars, banners, and inline error text.
 String userFacingError(Object error) {
   if (error is AsyncError) {
     return userFacingError(error.error);
+  }
+  if (error is TimeoutException) {
+    return 'This is taking longer than expected. Please try again.';
   }
   if (error is StateError) {
     final msg = error.message;
     if (msg.contains('API_BASE_URL')) {
       return "We couldn't reach FocusFlow. Connect to the internet and try again.";
     }
+    if (msg == 'recording_upload_incomplete') {
+      return 'That recording could not be uploaded right now. Please try again.';
+    }
+    return sanitizeUserMessage(
+      msg,
+      fallback: 'Something went wrong. Please try again.',
+    );
   }
   if (error is DioException) {
     return _dioExceptionMessage(error);
@@ -139,6 +177,12 @@ String _badResponseMessage(DioException e) {
     case 401:
       if (isAuthLoginRequest(e)) {
         return 'Sign-in failed. Check your email and password.';
+      }
+      if (isGoogleAuthRequest(e)) {
+        return 'Google sign-in could not be completed. Please try again.';
+      }
+      if (isPasswordResetRequest(e)) {
+        return 'That reset code did not work. Check the code and try again.';
       }
       return 'Session expired. Please log in again.';
     case 400:

@@ -60,7 +60,6 @@ class _NoteEditorPageState extends ConsumerState<NoteEditorPage> {
         _serverUpdatedAt = n.updatedAt;
         _loading = false;
       });
-      context.pushReplacement('/inbox/notes/${n.id}');
     } on DioException catch (e) {
       if (!mounted) return;
       if (isRecoverableNetworkDioError(e)) {
