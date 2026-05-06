@@ -61,11 +61,10 @@ class _TimelineWeekStripVariantAState
   static const int _weekPageCount = 41;
   static const int _originPage = 20;
   static const double _chipGap = 3;
-  static const double _navColWidth = 40;
+  static const double _navHitWidth = 40;
+  static const double _stripHorizontalPadding = 6;
 
-  /// ~1.0 keeps **six** day chips on one row on typical phones; previously 1.7
-  /// forced horizontal scroll (~4 visible). User-requested ~30% smaller feel.
-  static const double _chipScale = 1.0;
+  static const double _chipScale = 1.04;
 
   late final PageController _pageController;
   bool _suppressPageChanged = false;
@@ -82,6 +81,7 @@ class _TimelineWeekStripVariantAState
     _pageController = PageController(initialPage: _originPage);
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (mounted) setState(() => _firstPaintDone = true);
+      _schedulePreloadAround(_originPage);
     });
   }
 
@@ -109,6 +109,7 @@ class _TimelineWeekStripVariantAState
       _suppressPageChanged = true;
       _pageController.jumpToPage(target);
       setState(() => _surfacePage = target);
+      _schedulePreloadAround(target);
       SchedulerBinding.instance.addPostFrameCallback((_) {
         if (mounted) _suppressPageChanged = false;
       });
@@ -125,6 +126,7 @@ class _TimelineWeekStripVariantAState
       return;
     }
     _consumedInitialPageCallback = true;
+    _schedulePreloadAround(page);
     final today = _dateOnly(DateTime.now());
     final selected = parseLocalYmd(widget.dayOn);
     final weekdayIndex = (selected.weekday - 1).clamp(0, 6);
@@ -168,14 +170,15 @@ class _TimelineWeekStripVariantAState
       builder: (context, constraints) {
         final maxW = constraints.maxWidth;
         final gapsTotal = _chipGap * 6;
-        final inner = (maxW - 2 * _navColWidth).clamp(0.0, double.infinity);
+        final inner = (maxW - 2 * _stripHorizontalPadding).clamp(
+          0.0,
+          double.infinity,
+        );
         final baseChip = inner > 0 && maxW.isFinite
             ? (inner - gapsTotal) / 7
             : 56.0;
-        // Keep a single rendering path (no nested horizontal scroll view) for
-        // smoother gesture performance on lower-end devices.
-        final chipW = (baseChip * _chipScale).clamp(42.0, 96.0);
-        final stripH = chipW;
+        final chipW = (baseChip * _chipScale).clamp(48.0, 108.0);
+        final stripH = chipW + 2;
 
         if (!summariesAsync.hasValue) {
           if (summariesAsync.isLoading) {
@@ -199,21 +202,15 @@ class _TimelineWeekStripVariantAState
         final map = summariesAsync.requireValue;
         final today = _dateOnly(DateTime.now());
         final maxPage = _weekPageCount - 1;
-        _schedulePreloadAround(_surfacePage);
 
         return SizedBox(
           height: stripH,
-          child: Row(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
+          child: Stack(
             children: [
-              _WeekNavArrow(
-                width: _navColWidth,
-                icon: Icons.chevron_left_rounded,
-                semanticLabel: 'Previous week',
-                onPressed: () => _goPage(-1),
-                enabled: _surfacePage > 0,
-              ),
-              Expanded(
+              Padding(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: _stripHorizontalPadding,
+                ),
                 child: PageView.builder(
                   controller: _pageController,
                   physics: const PageScrollPhysics(),
@@ -263,12 +260,29 @@ class _TimelineWeekStripVariantAState
                   },
                 ),
               ),
-              _WeekNavArrow(
-                width: _navColWidth,
-                icon: Icons.chevron_right_rounded,
-                semanticLabel: 'Next week',
-                onPressed: () => _goPage(1),
-                enabled: _surfacePage < maxPage,
+              Positioned(
+                left: 0,
+                top: 0,
+                bottom: 0,
+                child: _WeekNavArrow(
+                  width: _navHitWidth,
+                  icon: Icons.chevron_left_rounded,
+                  semanticLabel: 'Previous week',
+                  onPressed: () => _goPage(-1),
+                  enabled: _surfacePage > 0,
+                ),
+              ),
+              Positioned(
+                right: 0,
+                top: 0,
+                bottom: 0,
+                child: _WeekNavArrow(
+                  width: _navHitWidth,
+                  icon: Icons.chevron_right_rounded,
+                  semanticLabel: 'Next week',
+                  onPressed: () => _goPage(1),
+                  enabled: _surfacePage < maxPage,
+                ),
               ),
             ],
           ),

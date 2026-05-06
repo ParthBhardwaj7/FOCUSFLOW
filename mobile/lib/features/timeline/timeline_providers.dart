@@ -79,7 +79,7 @@ class DayStripSummariesNotifier
 
   /// SQLite + JSON decode for large windows on UI isolate can skip frames.
   /// Load the current neighborhood first, then lazily fill weeks as the strip moves.
-  static const _initialStripDayCount = 14;
+  static const _initialStripDayCount = 35;
 
   final Set<String> _knownDayOns = <String>{};
   final Set<String> _loadedDayOns = <String>{};
