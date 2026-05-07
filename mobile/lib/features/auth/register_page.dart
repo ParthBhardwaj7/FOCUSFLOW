@@ -76,6 +76,17 @@ class _RegisterPageState extends ConsumerState<RegisterPage> {
     final scheme = Theme.of(context).colorScheme;
     final muted = scheme.onSurfaceVariant;
     final supportEmail = dotenv.env['SUPPORT_EMAIL']?.trim() ?? '';
+    final screenWidth = MediaQuery.sizeOf(context).width;
+    final compact = screenWidth < 360;
+    final cozy = screenWidth < 400;
+    final brandSize = compact ? 36.0 : (cozy ? 40.0 : 46.0);
+    final headingSize = compact ? 34.0 : (cozy ? 38.0 : 44.0);
+    final cardPadding = compact
+        ? const EdgeInsets.fromLTRB(16, 18, 16, 20)
+        : const EdgeInsets.fromLTRB(20, 22, 20, 24);
+    final shellPadding = compact
+        ? const EdgeInsets.fromLTRB(14, 0, 14, 16)
+        : const EdgeInsets.fromLTRB(20, 0, 20, 20);
 
     return Scaffold(
       body: SafeArea(
@@ -95,34 +106,39 @@ class _RegisterPageState extends ConsumerState<RegisterPage> {
                   ),
                   child: Column(
                     children: [
-                      Row(
-                        children: [
-                          const Spacer(),
-                          Text(
-                            'Already have an account?',
-                            style: TextStyle(
-                              color: Colors.white.withValues(alpha: 0.9),
-                              fontSize: 12,
+                      Align(
+                        alignment: Alignment.centerRight,
+                        child: Wrap(
+                          alignment: WrapAlignment.end,
+                          crossAxisAlignment: WrapCrossAlignment.center,
+                          spacing: 8,
+                          runSpacing: 8,
+                          children: [
+                            Text(
+                              'Already have an account?',
+                              style: TextStyle(
+                                color: Colors.white.withValues(alpha: 0.9),
+                                fontSize: 12,
+                              ),
                             ),
-                          ),
-                          const SizedBox(width: 8),
-                          FilledButton.tonal(
-                            onPressed: () => context.replace('/auth/login'),
-                            style: FilledButton.styleFrom(
-                              backgroundColor: Colors.white.withValues(alpha: 0.24),
-                              foregroundColor: Colors.white,
-                              textStyle: const TextStyle(fontWeight: FontWeight.w700),
+                            FilledButton.tonal(
+                              onPressed: () => context.replace('/auth/login'),
+                              style: FilledButton.styleFrom(
+                                backgroundColor: Colors.white.withValues(alpha: 0.24),
+                                foregroundColor: Colors.white,
+                                textStyle: const TextStyle(fontWeight: FontWeight.w700),
+                              ),
+                              child: const Text('Sign In'),
                             ),
-                            child: const Text('Sign In'),
-                          ),
-                        ],
+                          ],
+                        ),
                       ),
                       const SizedBox(height: 14),
-                      const Text(
+                      Text(
                         'FocusFlow',
                         style: TextStyle(
                           color: Colors.white,
-                          fontSize: 46,
+                          fontSize: brandSize,
                           fontWeight: FontWeight.w900,
                           letterSpacing: -0.6,
                         ),
@@ -132,7 +148,7 @@ class _RegisterPageState extends ConsumerState<RegisterPage> {
                 ),
                 Expanded(
                   child: SingleChildScrollView(
-                    padding: const EdgeInsets.fromLTRB(20, 0, 20, 20),
+                    padding: shellPadding,
                     child: Transform.translate(
                       offset: const Offset(0, -14),
                       child: DecoratedBox(
@@ -148,13 +164,13 @@ class _RegisterPageState extends ConsumerState<RegisterPage> {
                           ],
                         ),
                         child: Padding(
-                          padding: const EdgeInsets.fromLTRB(20, 22, 20, 24),
+                          padding: cardPadding,
                           child: Column(
                             children: [
-                              const Text(
+                              Text(
                                 'Get started free.',
                                 style: TextStyle(
-                                  fontSize: 44,
+                                  fontSize: headingSize,
                                   fontWeight: FontWeight.w800,
                                   letterSpacing: -0.4,
                                 ),
@@ -245,7 +261,7 @@ class _RegisterPageState extends ConsumerState<RegisterPage> {
                               ),
                               const SizedBox(height: 14),
                               SizedBox(
-                                width: 180,
+                                width: compact ? double.infinity : 180,
                                 child: OutlinedButton(
                                   onPressed: session.isLoading
                                       ? null
