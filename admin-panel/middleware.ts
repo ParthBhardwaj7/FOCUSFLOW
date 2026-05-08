@@ -1,4 +1,6 @@
-export { default } from 'next-auth/middleware';
+import nextAuthMiddleware from 'next-auth/middleware';
+
+export default nextAuthMiddleware;
 
 /**
  * Do not protect: auth routes, static assets, and **public health** endpoints.

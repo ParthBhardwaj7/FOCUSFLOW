@@ -39,6 +39,8 @@ import 'inbox_voice_note_player.dart';
 const _kInboxDraftPrefs = 'ff_inbox_draft_json';
 const _kLastSaveText = 'ff_inbox_last_save_text';
 const _kLastSaveMs = 'ff_inbox_last_save_ms';
+const _kMinNoteTitleLength = 3;
+const _kMinNoteSummaryLength = 10;
 
 const _kPresetTags = ['Work', 'Personal', 'Urgent', 'Idea', 'Later'];
 
@@ -188,6 +190,62 @@ class _InboxPageState extends ConsumerState<InboxPage>
     return line.length > 120 ? '${line.substring(0, 120)}…' : line;
   }
 
+  ({String title, String summary}) _structuredNoteFromDraft(String raw) {
+    final normalized = raw.trim();
+    final nonEmptyLines = normalized
+        .split(RegExp(r'\r?\n'))
+        .map((e) => e.trim())
+        .where((e) => e.isNotEmpty)
+        .toList();
+
+    String title = '';
+    String summary = '';
+
+    if (nonEmptyLines.isNotEmpty) {
+      title = nonEmptyLines.first;
+      if (nonEmptyLines.length > 1) {
+        summary = nonEmptyLines.skip(1).join('\n').trim();
+      }
+    }
+
+    if (summary.isEmpty && normalized.contains('. ')) {
+      final firstBreak = normalized.indexOf('. ');
+      if (firstBreak > 0 && firstBreak < normalized.length - 2) {
+        title = normalized.substring(0, firstBreak + 1).trim();
+        summary = normalized.substring(firstBreak + 2).trim();
+      }
+    }
+
+    if (title.isEmpty) {
+      title = normalized;
+    }
+    if (title.length > 80) {
+      title = '${title.substring(0, 80).trim()}…';
+    }
+
+    if (summary.isEmpty) {
+      summary = normalized;
+    }
+    if (summary.length > 500) {
+      summary = '${summary.substring(0, 500).trim()}…';
+    }
+
+    if (title.length < _kMinNoteTitleLength) {
+      title = 'Quick note';
+    }
+    if (summary.length < _kMinNoteSummaryLength) {
+      summary = 'No summary added yet.';
+    }
+
+    return (title: title, summary: summary);
+  }
+
+  String _noteSummary(NoteModel n) {
+    final body = n.body.trim();
+    if (body.isNotEmpty) return body;
+    return 'No summary added yet.';
+  }
+
   String _tagsCsv() => _selectedTags.join(',');
 
   Set<String> _parsedTags(NoteModel note) {
@@ -267,6 +325,7 @@ class _InboxPageState extends ConsumerState<InboxPage>
     final text = _quick.text.trim();
     if (text.isEmpty) return;
     if (text.length > 500) return;
+    final structured = _structuredNoteFromDraft(text);
 
     final p = await SharedPreferences.getInstance();
     final last = p.getString(_kLastSaveText);
@@ -310,8 +369,8 @@ class _InboxPageState extends ConsumerState<InboxPage>
     try {
       await store.enqueueCapture(
         localId: localId,
-        title: text,
-        body: '',
+        title: structured.title,
+        body: structured.summary,
         tags: _tagsCsv(),
       );
       invalidateInboxCachesWidget(ref);
@@ -333,7 +392,11 @@ class _InboxPageState extends ConsumerState<InboxPage>
     try {
       await ref
           .read(focusFlowClientProvider)
-          .createNote(title: text, body: '', tags: _tagsCsv());
+          .createNote(
+            title: structured.title,
+            body: structured.summary,
+            tags: _tagsCsv(),
+          );
       await store.deleteRow(localId);
       invalidateInboxCachesWidget(ref);
     } on DioException catch (e) {
@@ -344,7 +407,11 @@ class _InboxPageState extends ConsumerState<InboxPage>
           onRetry: () async {
             await ref
                 .read(focusFlowClientProvider)
-                .createNote(title: text, body: '', tags: _tagsCsv());
+                .createNote(
+                  title: structured.title,
+                  body: structured.summary,
+                  tags: _tagsCsv(),
+                );
             await store.deleteRow(localId);
             invalidateInboxCachesWidget(ref);
           },
@@ -1048,6 +1115,8 @@ class _InboxPageState extends ConsumerState<InboxPage>
                 final hints = InboxSmartHints.analyze(_quick.text);
                 final keyboardInset = MediaQuery.of(context).viewInsets.bottom;
                 final safeBottom = MediaQuery.paddingOf(context).bottom;
+                final screenWidth = MediaQuery.sizeOf(context).width;
+                final compact = screenWidth < 370;
 
                 return Consumer(
                   builder: (context, ref, _) {
@@ -1133,7 +1202,7 @@ class _InboxPageState extends ConsumerState<InboxPage>
                                           style: TextStyle(
                                             color: TimelineTokens.adaptivePrimaryText(context),
                                             fontWeight: FontWeight.w800,
-                                            fontSize: 28,
+                                            fontSize: compact ? 24 : 28,
                                             letterSpacing: -0.5,
                                           ),
                                         ),
@@ -1160,11 +1229,19 @@ class _InboxPageState extends ConsumerState<InboxPage>
                                           ),
                                         ],
                                       ),
+                                      IconButton(
+                                        tooltip: 'New note',
+                                        onPressed: () => context.push('/inbox/notes/new'),
+                                        icon: Icon(
+                                          Icons.note_add_outlined,
+                                          color: Theme.of(context).colorScheme.primary,
+                                        ),
+                                      ),
                                       if (notes.isNotEmpty)
                                         TextButton(
                                           onPressed: () => _clearAll(notes),
                                           child: Text(
-                                            'Clear all',
+                                            compact ? 'Clear' : 'Clear all',
                                             style: TextStyle(
                                               color: Theme.of(context)
                                                   .colorScheme
@@ -1220,8 +1297,7 @@ class _InboxPageState extends ConsumerState<InboxPage>
                                                   ),
                                                 ],
                                                 decoration: InputDecoration(
-                                                  hintText:
-                                                      "What's on your mind?",
+                                                  hintText: 'Add…',
                                                   hintStyle: TextStyle(
                                                     color: TimelineTokens
                                                         .adaptiveSecondaryText(context)
@@ -1232,7 +1308,7 @@ class _InboxPageState extends ConsumerState<InboxPage>
                                                       const EdgeInsets.fromLTRB(
                                                         14,
                                                         14,
-                                                        96,
+                                                        104,
                                                         14,
                                                       ),
                                                   suffixIcon: null,
@@ -1279,11 +1355,11 @@ class _InboxPageState extends ConsumerState<InboxPage>
                                         ),
                                       ),
                                       Positioned(
-                                        right: 48,
+                                        right: compact ? 44 : 48,
                                         top: 6,
                                         child: SizedBox(
-                                          width: 44,
-                                          height: 44,
+                                          width: compact ? 40 : 44,
+                                          height: compact ? 40 : 44,
                                           child: Tooltip(
                                             message: _voice.micPermanentlyDenied
                                                 ? 'Microphone disabled in system settings'
@@ -1378,7 +1454,10 @@ class _InboxPageState extends ConsumerState<InboxPage>
                                                   : Theme.of(context)
                                                       .colorScheme
                                                       .onPrimary,
-                                              minimumSize: const Size(44, 44),
+                                              minimumSize: Size(
+                                                compact ? 40 : 44,
+                                                compact ? 40 : 44,
+                                              ),
                                             ),
                                             onPressed:
                                                 _submitting ||
@@ -1625,10 +1704,31 @@ class _InboxPageState extends ConsumerState<InboxPage>
                                                       12,
                                                     ),
                                                 child: Row(
+                                                  crossAxisAlignment:
+                                                      CrossAxisAlignment.start,
                                                   children: [
+                                                    Padding(
+                                                      padding:
+                                                          const EdgeInsets.only(
+                                                            top: 2,
+                                                          ),
+                                                      child: Icon(
+                                                        Icons
+                                                            .view_timeline_outlined,
+                                                        size: 18,
+                                                        color: TimelineTokens
+                                                            .adaptiveSecondaryText(
+                                                              context,
+                                                            )
+                                                            .withValues(
+                                                              alpha: 0.9,
+                                                            ),
+                                                      ),
+                                                    ),
+                                                    const SizedBox(width: 10),
                                                     Expanded(
                                                       child: Text(
-                                                        '💡 Schedule on your timeline${h != null ? ' (next gap around $hourLabel)' : ''}.',
+                                                        'Schedule on your timeline${h != null ? ' (next gap around $hourLabel)' : ''}.',
                                                         style: TextStyle(
                                                           color: TimelineTokens
                                                               .adaptivePrimaryText(
@@ -1716,19 +1816,9 @@ class _InboxPageState extends ConsumerState<InboxPage>
                                 ),
                               ),
                               if (notes.isEmpty)
-                                SliverFillRemaining(
+                                const SliverFillRemaining(
                                   hasScrollBody: false,
-                                  child: _EmptyInbox(
-                                    onChip: (prefix) {
-                                      _quick.text = prefix;
-                                      _quick.selection =
-                                          TextSelection.collapsed(
-                                            offset: prefix.length,
-                                          );
-                                      _quickFocus.requestFocus();
-                                      setState(() {});
-                                    },
-                                  ),
+                                  child: _EmptyInbox(),
                                 )
                               else if (notes.length > 5)
                                 ..._buildGroupedSlivers(
@@ -1772,10 +1862,8 @@ class _InboxPageState extends ConsumerState<InboxPage>
                                       if (notes.isNotEmpty) ...[
                                         Text(
                                           textCaptureCount > 0 && hasVoiceNote
-                                              ? 'Text: ← delete · schedule →   Voice: ← delete · tap for play/rename'
-                                              : (hasVoiceNote
-                                                    ? 'Voice notes: tap to expand (play, rename). Swipe left to delete.'
-                                                    : '← swipe left to delete   ·   swipe right to schedule →'),
+                                              ? 'Swipe to delete · text: swipe right to schedule · voice: tap row'
+                                              : 'Swipe left to delete · swipe right to schedule',
                                           textAlign: TextAlign.center,
                                           style: TextStyle(
                                             fontFamily: 'monospace',
@@ -1995,14 +2083,34 @@ class _InboxPageState extends ConsumerState<InboxPage>
                       ),
                       const SizedBox(width: 8),
                       Expanded(
-                        child: Text(
-                          line,
-                          style: TextStyle(
-                            color: TimelineTokens.adaptivePrimaryText(context),
-                            fontWeight: FontWeight.w700,
-                            fontSize: 15,
-                            height: 1.3,
-                          ),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              line,
+                              style: TextStyle(
+                                color: TimelineTokens.adaptivePrimaryText(context),
+                                fontWeight: FontWeight.w700,
+                                fontSize: 15,
+                                height: 1.3,
+                              ),
+                            ),
+                            if (!voice) ...[
+                              const SizedBox(height: 4),
+                              Text(
+                                _noteSummary(n),
+                                maxLines: expanded ? 5 : 2,
+                                overflow: TextOverflow.ellipsis,
+                                style: TextStyle(
+                                  color: TimelineTokens.adaptiveSecondaryText(
+                                    context,
+                                  ).withValues(alpha: 0.92),
+                                  fontSize: 12,
+                                  height: 1.35,
+                                ),
+                              ),
+                            ],
+                          ],
                         ),
                       ),
                       Text(
@@ -2103,7 +2211,7 @@ class _InboxPageState extends ConsumerState<InboxPage>
                           ),
                         OutlinedButton(
                           onPressed: () => _editInline(n, line),
-                          child: Text(voice ? 'Rename' : 'Edit'),
+                          child: Text(voice ? 'Rename' : 'Open note'),
                         ),
                         TextButton(
                           onPressed: () => _scheduleDelete(n),
@@ -2125,6 +2233,11 @@ class _InboxPageState extends ConsumerState<InboxPage>
   }
 
   Future<void> _editInline(NoteModel n, String line) async {
+    if (!n.isLocalQueued && !_isVoiceNote(n)) {
+      if (!mounted) return;
+      context.push('/inbox/notes/${n.id}');
+      return;
+    }
     final c = TextEditingController(text: line);
     final ok = await showDialog<String>(
       context: context,
@@ -2262,104 +2375,45 @@ class _BarsPainter extends CustomPainter {
   bool shouldRepaint(covariant _BarsPainter oldDelegate) => oldDelegate.t != t;
 }
 
-class _EmptyInbox extends StatefulWidget {
-  const _EmptyInbox({required this.onChip});
-
-  final void Function(String prefix) onChip;
-
-  @override
-  State<_EmptyInbox> createState() => _EmptyInboxState();
-}
-
-class _EmptyInboxState extends State<_EmptyInbox>
-    with SingleTickerProviderStateMixin {
-  late final AnimationController _pulse;
-
-  @override
-  void initState() {
-    super.initState();
-    _pulse = AnimationController(
-      vsync: this,
-      duration: const Duration(milliseconds: 1400),
-    )..repeat(reverse: true);
-  }
-
-  @override
-  void dispose() {
-    _pulse.dispose();
-    super.dispose();
-  }
+class _EmptyInbox extends StatelessWidget {
+  const _EmptyInbox();
 
   @override
   Widget build(BuildContext context) {
+    final primary = TimelineTokens.adaptivePrimaryText(context);
+    final secondary = TimelineTokens.adaptiveSecondaryText(context);
     return Center(
       child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 24),
+        padding: const EdgeInsets.symmetric(horizontal: 32),
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            ScaleTransition(
-              scale: Tween(begin: 0.94, end: 1.06).animate(
-                CurvedAnimation(parent: _pulse, curve: Curves.easeInOut),
-              ),
-              child: const Text('💡', style: TextStyle(fontSize: 48)),
+            Icon(
+              Icons.edit_note_rounded,
+              size: 44,
+              color: primary.withValues(alpha: 0.88),
             ),
-            const SizedBox(height: 16),
+            const SizedBox(height: 20),
             Text(
-              "What's on your mind?",
+              'Capture ideas, task & thought',
               textAlign: TextAlign.center,
               style: TextStyle(
-                color: TimelineTokens.adaptivePrimaryText(context),
+                color: primary,
                 fontWeight: FontWeight.w700,
-                fontSize: 18,
+                fontSize: 17,
+                height: 1.35,
+                letterSpacing: -0.25,
               ),
             ),
-            const SizedBox(height: 16),
-            Transform.scale(
-              scale: 0.7,
-              alignment: Alignment.center,
-              child: Wrap(
-                spacing: 8,
-                runSpacing: 8,
-                alignment: WrapAlignment.center,
-                children: [
-                  ActionChip(
-                    visualDensity: VisualDensity.compact,
-                    materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                    label: const Text('⚡ Quick Task'),
-                    onPressed: () => widget.onChip('[Quick Task] '),
-                  ),
-                  ActionChip(
-                    visualDensity: VisualDensity.compact,
-                    materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                    label: const Text('💡 Idea'),
-                    onPressed: () => widget.onChip('[Idea] '),
-                  ),
-                  ActionChip(
-                    visualDensity: VisualDensity.compact,
-                    materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                    label: const Text('📅 Schedule Later'),
-                    onPressed: () => widget.onChip('[Schedule Later] '),
-                  ),
-                  ActionChip(
-                    visualDensity: VisualDensity.compact,
-                    materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                    label: const Text('💼 Work'),
-                    onPressed: () => widget.onChip('[Work] '),
-                  ),
-                  ActionChip(
-                    visualDensity: VisualDensity.compact,
-                    materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                    label: const Text('🏠 Personal'),
-                    onPressed: () => widget.onChip('[Personal] '),
-                  ),
-                  ActionChip(
-                    visualDensity: VisualDensity.compact,
-                    materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                    label: const Text('🔥 Urgent'),
-                    onPressed: () => widget.onChip('[Urgent] '),
-                  ),
-                ],
+            const SizedBox(height: 10),
+            Text(
+              'Quickly add anything on your mind',
+              textAlign: TextAlign.center,
+              style: TextStyle(
+                color: secondary.withValues(alpha: 0.9),
+                fontWeight: FontWeight.w400,
+                fontSize: 14,
+                height: 1.4,
               ),
             ),
           ],

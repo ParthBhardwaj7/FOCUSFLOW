@@ -9,6 +9,7 @@ import '../../core/models/user_model.dart';
 import '../../core/providers.dart';
 import '../../core/session/session_controller.dart';
 import '../../services/google_identity_provider.dart';
+import 'google_sign_in_helpers.dart';
 
 class LoginPage extends ConsumerStatefulWidget {
   const LoginPage({super.key});
@@ -66,17 +67,6 @@ class _LoginPageState extends ConsumerState<LoginPage> {
     _newPassword.dispose();
     _confirmPassword.dispose();
     super.dispose();
-  }
-
-  String _googleErrorMessage(Object error) {
-    final raw = error.toString();
-    if (raw.contains('id token') || raw.contains('ID token')) {
-      return 'Google sign-in is unavailable right now. Please try again shortly.';
-    }
-    if (raw.contains('network') || raw.contains('connection')) {
-      return 'Network issue. Please check your internet and try again.';
-    }
-    return 'Could not sign in with Google. Please try again.';
   }
 
   Future<void> _openSupportEmail(String supportEmail) async {
@@ -460,6 +450,21 @@ class _LoginPageState extends ConsumerState<LoginPage> {
                                     onPressed: session.isLoading
                                         ? null
                                         : () async {
+                                            if (!isGoogleOAuthConfigured()) {
+                                              if (!context.mounted) return;
+                                              ScaffoldMessenger.of(context).showSnackBar(
+                                                SnackBar(
+                                                  content: Text(
+                                                    messageForGoogleSignInFailure(
+                                                      StateError(
+                                                        'GOOGLE_WEB_CLIENT_ID missing.',
+                                                      ),
+                                                    ),
+                                                  ),
+                                                ),
+                                              );
+                                              return;
+                                            }
                                             try {
                                               final g = ref.read(googleSignInProvider);
                                               final account = await g.signIn();
@@ -482,7 +487,10 @@ class _LoginPageState extends ConsumerState<LoginPage> {
                                               if (!context.mounted) return;
                                               debugPrint('Google sign-in failed: $e');
                                               ScaffoldMessenger.of(context).showSnackBar(
-                                                SnackBar(content: Text(_googleErrorMessage(e))),
+                                                SnackBar(
+                                                  content:
+                                                      Text(messageForGoogleSignInFailure(e)),
+                                                ),
                                               );
                                             }
                                           },

@@ -30,6 +30,23 @@ import 'timeline_week_strip.dart';
 
 const double _kPixelsPerMinute = 0.55;
 
+/// Incomplete slots share one calm monochrome frame (presentation only).
+Color _timelineIncompleteBorder(BuildContext context) {
+  if (TimelineTokens.isLight(context)) {
+    return const Color(0xFF2B2B2B);
+  }
+  return Theme.of(context).colorScheme.outline.withValues(alpha: 0.36);
+}
+
+Color _timelineIncompleteTimeColor(BuildContext context) {
+  if (TimelineTokens.isLight(context)) {
+    return const Color(0xFF141414);
+  }
+  return Theme.of(
+    context,
+  ).colorScheme.onSurface.withValues(alpha: 0.74);
+}
+
 String _displayTitle(String title) {
   final t = title.trim();
   return t.isEmpty ? 'Untitled task' : t;
@@ -748,44 +765,49 @@ class _AppHeader extends ConsumerWidget {
     final dateTitle = DateFormat('d MMMM y').format(d);
     final titleColor = TimelineTokens.adaptivePrimaryText(context);
     final subColor = TimelineTokens.adaptiveSecondaryText(context);
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.stretch,
-      children: [
-        Row(
-          crossAxisAlignment: CrossAxisAlignment.start,
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final compact = constraints.maxWidth < 360;
+        final titleSize = compact ? 22.0 : 28.0;
+        final titleLines = compact ? 1 : 2;
+        return Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    dateTitle,
-                    maxLines: 2,
-                    overflow: TextOverflow.ellipsis,
-                    style: TextStyle(
-                      color: titleColor,
-                      fontSize: 28,
-                      fontWeight: FontWeight.w800,
-                      letterSpacing: -0.5,
-                      height: 1.05,
-                    ),
+            Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        dateTitle,
+                        maxLines: titleLines,
+                        overflow: TextOverflow.ellipsis,
+                        style: TextStyle(
+                          color: titleColor,
+                          fontSize: titleSize,
+                          fontWeight: FontWeight.w800,
+                          letterSpacing: -0.5,
+                          height: 1.05,
+                        ),
+                      ),
+                      const SizedBox(height: 4),
+                      Text(
+                        '$slotCount ${slotCount == 1 ? 'block' : 'blocks'}',
+                        style: TextStyle(
+                          fontSize: 12,
+                          fontWeight: FontWeight.w500,
+                          color: subColor,
+                        ),
+                      ),
+                    ],
                   ),
-                  const SizedBox(height: 4),
-                  Text(
-                    '$slotCount ${slotCount == 1 ? 'block' : 'blocks'}',
-                    style: TextStyle(
-                      fontSize: 12,
-                      fontWeight: FontWeight.w500,
-                      color: subColor,
-                    ),
-                  ),
-                ],
-              ),
-            ),
-            PopupMenuButton<String>(
-              icon: Icon(Icons.more_vert, color: subColor),
-              color: TimelineTokens.adaptiveSurfacePanel(context),
-              onSelected: (v) async {
+                ),
+                PopupMenuButton<String>(
+                  icon: Icon(Icons.more_vert, color: subColor),
+                  color: TimelineTokens.adaptiveSurfacePanel(context),
+                  onSelected: (v) async {
                 if (v == 'prev') {
                   _shiftWeek(ref, -7);
                   return;
@@ -808,34 +830,36 @@ class _AppHeader extends ConsumerWidget {
                   return;
                 }
                 if (v == 'reset') await onResetDay();
-              },
-              itemBuilder: (ctx) {
-                final fg = TimelineTokens.adaptivePrimaryText(ctx);
-                return [
-                  PopupMenuItem(
-                    value: 'pick',
-                    child: Text('Pick date', style: TextStyle(color: fg)),
-                  ),
-                  PopupMenuItem(
-                    value: 'prev',
-                    child: Text('Previous week', style: TextStyle(color: fg)),
-                  ),
-                  PopupMenuItem(
-                    value: 'next',
-                    child: Text('Next week', style: TextStyle(color: fg)),
-                  ),
-                  PopupMenuItem(
-                    value: 'reset',
-                    child: Text('Reset day…', style: TextStyle(color: fg)),
-                  ),
-                ];
-              },
+                  },
+                  itemBuilder: (ctx) {
+                    final fg = TimelineTokens.adaptivePrimaryText(ctx);
+                    return [
+                      PopupMenuItem(
+                        value: 'pick',
+                        child: Text('Pick date', style: TextStyle(color: fg)),
+                      ),
+                      PopupMenuItem(
+                        value: 'prev',
+                        child: Text('Previous week', style: TextStyle(color: fg)),
+                      ),
+                      PopupMenuItem(
+                        value: 'next',
+                        child: Text('Next week', style: TextStyle(color: fg)),
+                      ),
+                      PopupMenuItem(
+                        value: 'reset',
+                        child: Text('Reset day…', style: TextStyle(color: fg)),
+                      ),
+                    ];
+                  },
+                ),
+              ],
             ),
+            const SizedBox(height: 10),
+            _DeferredWeekStrip(dayOn: dayOn),
           ],
-        ),
-        const SizedBox(height: 10),
-        _DeferredWeekStrip(dayOn: dayOn),
-      ],
+        );
+      },
     );
   }
 }
@@ -1457,13 +1481,8 @@ class _TimelineRow extends StatelessWidget {
     final timeMuted = TimelineTokens.adaptiveSecondaryText(
       context,
     ).withValues(alpha: TimelineTokens.isLight(context) ? 0.88 : 0.78);
-    final timeHot = inProgress
-        ? Theme.of(context).colorScheme.primary
-        : upNext
-        ? TimelineTokens.green
-        : overdueLive
-        ? TimelineTokens.stripYellow
-        : timeMuted;
+    final timeHot =
+        isMuted ? timeMuted : _timelineIncompleteTimeColor(context);
 
     return IntrinsicHeight(
       child: Padding(
@@ -1562,9 +1581,6 @@ class _TimelineNode extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final light = TimelineTokens.isLight(context);
-    final cs = Theme.of(context).colorScheme;
-    final accent = cs.primary;
-    final onAccent = cs.onPrimary;
     final isDone = slot.isDone;
     final isSkipped = slot.status == 'SKIPPED';
 
@@ -1572,44 +1588,18 @@ class _TimelineNode extends StatelessWidget {
     Color bg = TimelineTokens.adaptiveSurfacePanel(context);
     Color fg = TimelineTokens.adaptiveSecondaryText(
       context,
-    ).withValues(alpha: isSkipped ? 0.45 : 0.9);
-    List<BoxShadow>? shadows;
+    ).withValues(alpha: isSkipped ? 0.45 : 0.92);
 
     if (isDone) {
-      borderColor = TimelineTokens.green;
+      borderColor = TimelineTokens.green.withValues(alpha: light ? 0.72 : 0.9);
       bg = TimelineTokens.adaptiveCardPanel(context);
-      fg = light ? const Color(0xFF0D4D2C) : TimelineTokens.green;
-    } else if (isMissed) {
-      borderColor = TimelineTokens.stripRed;
-      bg = TimelineTokens.stripRed.withValues(alpha: 0.12);
-      fg = light ? const Color(0xFFB71C1C) : TimelineTokens.stripRed;
-    } else if (overdueLive) {
-      borderColor = TimelineTokens.stripYellow;
-      bg = TimelineTokens.stripYellow.withValues(alpha: 0.12);
-      fg = light ? const Color(0xFF6D4C00) : TimelineTokens.stripYellow;
-      shadows = [
-        BoxShadow(
-          color: TimelineTokens.stripYellow.withValues(alpha: 0.35),
-          blurRadius: 12,
-        ),
-      ];
-    } else if (inProgress) {
-      borderColor = accent;
-      bg = accent;
-      fg = onAccent;
-      shadows = [
-        BoxShadow(color: accent.withValues(alpha: 0.55), blurRadius: 20),
-      ];
-    } else if (upNext) {
-      borderColor = TimelineTokens.green;
-      bg = TimelineTokens.green.withValues(alpha: 0.14);
-      fg = light ? const Color(0xFF0D4D2C) : TimelineTokens.green;
-      shadows = [
-        BoxShadow(
-          color: TimelineTokens.green.withValues(alpha: 0.4),
-          blurRadius: 14,
-        ),
-      ];
+      fg = light ? const Color(0xFF145A3F) : TimelineTokens.green;
+    } else {
+      borderColor = _timelineIncompleteBorder(context);
+      bg = TimelineTokens.adaptiveSurfacePanel(context);
+      fg = TimelineTokens.adaptivePrimaryText(context).withValues(
+            alpha: isSkipped ? 0.38 : (light ? 0.94 : 0.84),
+          );
     }
 
     return Container(
@@ -1619,11 +1609,7 @@ class _TimelineNode extends StatelessWidget {
       decoration: BoxDecoration(
         color: bg,
         shape: BoxShape.circle,
-        border: Border.all(
-          color: borderColor,
-          width: inProgress || upNext ? 2.5 : 2,
-        ),
-        boxShadow: shadows,
+        border: Border.all(color: borderColor, width: 2),
       ),
       child: Text(
         isDone ? '✓' : _nodeLabel(slot),
@@ -1736,13 +1722,10 @@ class _TimelineCard extends StatelessWidget {
     final sound = (slot.soundLabel?.trim().isNotEmpty ?? false)
         ? slot.soundLabel!.trim()
         : 'No sound';
-    final isMissed = slot.isMissed;
     final isDone = slot.isDone;
 
     Color borderColor = TimelineTokens.adaptiveBorder(context);
     Color fill = TimelineTokens.adaptiveCardPanel(context);
-    List<BoxShadow>? shadows;
-    var borderWidth = 1.0;
 
     if (isDone) {
       borderColor = TimelineTokens.green.withValues(alpha: 0.45);
@@ -1752,82 +1735,16 @@ class _TimelineCard extends StatelessWidget {
               cs.surface,
             )
           : TimelineTokens.green.withValues(alpha: 0.1);
-    } else if (isMissed) {
-      borderColor = TimelineTokens.stripRed.withValues(alpha: 0.85);
-      fill = light
-          ? Color.alphaBlend(
-              TimelineTokens.stripRed.withValues(alpha: 0.1),
-              cs.surface,
-            )
-          : const Color(0xFF2A1818);
-      borderWidth = 1.5;
-      shadows = [
-        BoxShadow(
-          color: TimelineTokens.stripRed.withValues(alpha: 0.22),
-          blurRadius: 14,
-          offset: const Offset(0, 4),
-        ),
-      ];
-    } else if (overdueLive) {
-      borderColor = TimelineTokens.stripYellow.withValues(alpha: 0.9);
-      fill = light
-          ? Color.alphaBlend(
-              TimelineTokens.stripYellow.withValues(alpha: 0.12),
-              cs.surface,
-            )
-          : TimelineTokens.stripYellow.withValues(alpha: 0.08);
-      borderWidth = 1.5;
-      shadows = [
-        BoxShadow(
-          color: TimelineTokens.stripYellow.withValues(alpha: 0.2),
-          blurRadius: 12,
-          offset: const Offset(0, 3),
-        ),
-      ];
-    } else if (inProgress) {
-      borderColor = cs.primary;
-      fill = light
-          ? Color.alphaBlend(cs.primary.withValues(alpha: 0.12), cs.surface)
-          : cs.primary.withValues(alpha: 0.16);
-      borderWidth = 2;
-      shadows = [
-        BoxShadow(
-          color: cs.primary.withValues(alpha: 0.35),
-          blurRadius: 18,
-          spreadRadius: 0,
-          offset: const Offset(0, 4),
-        ),
-      ];
-    } else if (upNext) {
-      borderColor = TimelineTokens.green.withValues(alpha: 0.85);
-      fill = light
-          ? Color.alphaBlend(
-              TimelineTokens.green.withValues(alpha: 0.1),
-              cs.surface,
-            )
-          : TimelineTokens.green.withValues(alpha: 0.08);
-      borderWidth = 1.5;
-      shadows = [
-        BoxShadow(
-          color: TimelineTokens.green.withValues(alpha: 0.28),
-          blurRadius: 16,
-          offset: const Offset(0, 3),
-        ),
-      ];
+    } else {
+      borderColor = _timelineIncompleteBorder(context);
+      fill = TimelineTokens.adaptiveCardPanel(context);
     }
 
     final metaColor = TimelineTokens.adaptiveSecondaryText(
       context,
-    ).withValues(alpha: 0.95);
-    final metaHot = inProgress
-        ? cs.primary
-        : upNext
-        ? TimelineTokens.green
-        : overdueLive
-        ? TimelineTokens.stripYellow
-        : isMissed
-        ? TimelineTokens.stripRed
-        : metaColor;
+    ).withValues(alpha: 0.94);
+    final metaHot =
+        isDone ? metaColor.withValues(alpha: light ? 0.78 : 0.85) : metaColor;
 
     final showMitStripe = slot.isMit && !isMuted;
 
@@ -1842,8 +1759,7 @@ class _TimelineCard extends StatelessWidget {
             decoration: BoxDecoration(
               color: fill,
               borderRadius: BorderRadius.circular(14),
-              border: Border.all(color: borderColor, width: borderWidth),
-              boxShadow: shadows,
+              border: Border.all(color: borderColor, width: 1),
             ),
             child: ClipRRect(
               borderRadius: BorderRadius.circular(13),
@@ -1852,10 +1768,8 @@ class _TimelineCard extends StatelessWidget {
                 children: [
                   if (showMitStripe)
                     Container(
-                      width: 4,
-                      color: TimelineTokens.taskMitOrange.withValues(
-                        alpha: inProgress ? 1 : 0.85,
-                      ),
+                      width: 3,
+                      color: cs.outlineVariant.withValues(alpha: light ? 0.62 : 0.45),
                     ),
                   Expanded(
                     child: Padding(
@@ -1884,72 +1798,11 @@ class _TimelineCard extends StatelessWidget {
                                 ),
                               ),
                               if (inProgress)
-                                Container(
-                                  padding: const EdgeInsets.symmetric(
-                                    horizontal: 6,
-                                    vertical: 2,
-                                  ),
-                                  decoration: BoxDecoration(
-                                    color: cs.primary.withValues(alpha: 0.22),
-                                    borderRadius: BorderRadius.circular(6),
-                                  ),
-                                  child: Text(
-                                    'NOW',
-                                    style: TextStyle(
-                                      color: cs.primary,
-                                      fontSize: 8,
-                                      fontWeight: FontWeight.w900,
-                                      letterSpacing: 0.6,
-                                    ),
-                                  ),
-                                ),
+                                _TimelineSubtlePill(label: 'NOW', light: light),
                               if (upNext && !inProgress)
-                                Container(
-                                  padding: const EdgeInsets.symmetric(
-                                    horizontal: 6,
-                                    vertical: 2,
-                                  ),
-                                  decoration: BoxDecoration(
-                                    color: TimelineTokens.green.withValues(
-                                      alpha: 0.18,
-                                    ),
-                                    borderRadius: BorderRadius.circular(6),
-                                  ),
-                                  child: Text(
-                                    'NEXT',
-                                    style: TextStyle(
-                                      color: light
-                                          ? const Color(0xFF0D4D2C)
-                                          : TimelineTokens.green,
-                                      fontSize: 8,
-                                      fontWeight: FontWeight.w900,
-                                      letterSpacing: 0.6,
-                                    ),
-                                  ),
-                                ),
+                                _TimelineSubtlePill(label: 'NEXT', light: light),
                               if (overdueLive && !inProgress)
-                                Container(
-                                  padding: const EdgeInsets.symmetric(
-                                    horizontal: 6,
-                                    vertical: 2,
-                                  ),
-                                  decoration: BoxDecoration(
-                                    color: TimelineTokens.stripYellow
-                                        .withValues(alpha: 0.16),
-                                    borderRadius: BorderRadius.circular(6),
-                                  ),
-                                  child: Text(
-                                    'LATE',
-                                    style: TextStyle(
-                                      color: light
-                                          ? const Color(0xFF6D4C00)
-                                          : TimelineTokens.stripYellow,
-                                      fontSize: 8,
-                                      fontWeight: FontWeight.w900,
-                                      letterSpacing: 0.6,
-                                    ),
-                                  ),
-                                ),
+                                _TimelineSubtlePill(label: 'LATE', light: light),
                             ],
                           ),
                           const SizedBox(height: 3),
@@ -1982,12 +1835,8 @@ class _TimelineCard extends StatelessWidget {
                               height: 32,
                               child: FilledButton.icon(
                                 style: FilledButton.styleFrom(
-                                  backgroundColor: upNext && !inProgress
-                                      ? TimelineTokens.green
-                                      : cs.primary,
-                                  foregroundColor: upNext && !inProgress
-                                      ? Colors.white
-                                      : cs.onPrimary,
+                                  backgroundColor: cs.primary,
+                                  foregroundColor: cs.onPrimary,
                                   shape: RoundedRectangleBorder(
                                     borderRadius: BorderRadius.circular(9),
                                   ),
@@ -2032,6 +1881,41 @@ class _TimelineCard extends StatelessWidget {
   }
 }
 
+class _TimelineSubtlePill extends StatelessWidget {
+  const _TimelineSubtlePill({required this.label, required this.light});
+
+  final String label;
+  final bool light;
+
+  @override
+  Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(6),
+        border: Border.all(
+          color: cs.outlineVariant.withValues(alpha: light ? 0.48 : 0.4),
+        ),
+        color: light
+            ? cs.surfaceContainerHighest.withValues(alpha: 0.55)
+            : cs.surface.withValues(alpha: 0.45),
+      ),
+      child: Text(
+        label,
+        style: TextStyle(
+          color: TimelineTokens.adaptiveSecondaryText(
+            context,
+          ).withValues(alpha: light ? 0.98 : 0.9),
+          fontSize: 8,
+          fontWeight: FontWeight.w800,
+          letterSpacing: 0.55,
+        ),
+      ),
+    );
+  }
+}
+
 class _MetaTag extends StatelessWidget {
   const _MetaTag({required this.label});
 
@@ -2039,17 +1923,19 @@ class _MetaTag extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final color = _tagColor(label);
+    final cs = Theme.of(context).colorScheme;
     final light = TimelineTokens.isLight(context);
-    final fg = light
-        ? Color.alphaBlend(Colors.black.withValues(alpha: 0.38), color)
-        : color;
+    final fg = TimelineTokens.adaptiveSecondaryText(
+      context,
+    ).withValues(alpha: light ? 0.95 : 0.88);
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
       decoration: BoxDecoration(
-        color: color.withValues(alpha: light ? 0.18 : 0.12),
+        color: cs.surfaceContainerHighest.withValues(alpha: light ? 0.5 : 0.28),
         borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: color.withValues(alpha: light ? 0.45 : 0.25)),
+        border: Border.all(
+          color: cs.outlineVariant.withValues(alpha: light ? 0.52 : 0.38),
+        ),
       ),
       child: Text(
         label.toUpperCase(),
@@ -2065,20 +1951,6 @@ class _MetaTag extends StatelessWidget {
       ),
     );
   }
-
-  Color _tagColor(String label) {
-    final l = label.toLowerCase();
-    if (l.contains('work') || l.contains('gym') || l.contains('move')) {
-      return const Color(0xFFFF8C42);
-    }
-    if (l.contains('meet') || l.contains('call')) {
-      return const Color(0xFFFFC84A);
-    }
-    if (l.contains('routine') || l.contains('habit')) {
-      return TimelineTokens.green;
-    }
-    return TimelineTokens.blue;
-  }
 }
 
 class _SoundLabel extends StatelessWidget {
@@ -2088,11 +1960,13 @@ class _SoundLabel extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final primary = Theme.of(context).colorScheme.primary;
+    final iconColor = TimelineTokens.adaptiveSecondaryText(
+      context,
+    ).withValues(alpha: TimelineTokens.isLight(context) ? 0.85 : 0.78);
     return Row(
       mainAxisSize: MainAxisSize.min,
       children: [
-        Icon(Icons.music_note_rounded, color: primary, size: 12),
+        Icon(Icons.music_note_rounded, color: iconColor, size: 12),
         const SizedBox(width: 3),
         Flexible(
           child: Text(

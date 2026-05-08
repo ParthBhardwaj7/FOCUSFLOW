@@ -930,58 +930,64 @@ class _AddTaskHeader extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Row(
-      children: [
-        Material(
-          color: TimelineTokens.adaptiveCardPanel(context),
-          shape: const CircleBorder(),
-          child: InkWell(
-            customBorder: const CircleBorder(),
-            onTap: onBack,
-            child: SizedBox(
-              width: 44,
-              height: 44,
-              child: Icon(
-                Icons.arrow_back_rounded,
-                size: 20,
-                color: TimelineTokens.adaptivePrimaryText(context),
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final compact = constraints.maxWidth < 360;
+        return Row(
+          children: [
+            Material(
+              color: TimelineTokens.adaptiveCardPanel(context),
+              shape: const CircleBorder(),
+              child: InkWell(
+                customBorder: const CircleBorder(),
+                onTap: onBack,
+                child: SizedBox(
+                  width: 44,
+                  height: 44,
+                  child: Icon(
+                    Icons.arrow_back_rounded,
+                    size: 20,
+                    color: TimelineTokens.adaptivePrimaryText(context),
+                  ),
+                ),
               ),
             ),
-          ),
-        ),
-        Expanded(
-          child: Text(
-            title,
-            textAlign: TextAlign.center,
-            maxLines: 1,
-            overflow: TextOverflow.ellipsis,
-            style: GoogleFonts.outfit(
-              fontSize: 18,
-              fontWeight: FontWeight.w700,
-              letterSpacing: -0.3,
-              color: TimelineTokens.adaptivePrimaryText(context),
-            ),
-          ),
-        ),
-        SizedBox(
-          width: 88,
-          child: Align(
-            alignment: Alignment.centerRight,
-            child: Text(
-              dateLine,
-              textAlign: TextAlign.end,
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-              style: GoogleFonts.jetBrainsMono(
-                fontSize: 10,
-                fontWeight: FontWeight.w500,
-                color: TimelineTokens.adaptiveSecondaryText(context),
-                letterSpacing: 0.3,
+            const SizedBox(width: 8),
+            Expanded(
+              child: Text(
+                title,
+                textAlign: TextAlign.center,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: GoogleFonts.outfit(
+                  fontSize: compact ? 16 : 18,
+                  fontWeight: FontWeight.w700,
+                  letterSpacing: -0.3,
+                  color: TimelineTokens.adaptivePrimaryText(context),
+                ),
               ),
             ),
-          ),
-        ),
-      ],
+            ConstrainedBox(
+              constraints: BoxConstraints(maxWidth: compact ? 70 : 88),
+              child: Align(
+                alignment: Alignment.centerRight,
+                child: Text(
+                  dateLine,
+                  textAlign: TextAlign.end,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: GoogleFonts.jetBrainsMono(
+                    fontSize: compact ? 9 : 10,
+                    fontWeight: FontWeight.w500,
+                    color: TimelineTokens.adaptiveSecondaryText(context),
+                    letterSpacing: 0.3,
+                  ),
+                ),
+              ),
+            ),
+          ],
+        );
+      },
     );
   }
 }

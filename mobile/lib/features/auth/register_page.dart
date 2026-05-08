@@ -8,6 +8,7 @@ import '../../core/dio_errors.dart';
 import '../../core/models/user_model.dart';
 import '../../core/session/session_controller.dart';
 import '../../services/google_identity_provider.dart';
+import 'google_sign_in_helpers.dart';
 
 class RegisterPage extends ConsumerStatefulWidget {
   const RegisterPage({super.key});
@@ -266,6 +267,21 @@ class _RegisterPageState extends ConsumerState<RegisterPage> {
                                   onPressed: session.isLoading
                                       ? null
                                       : () async {
+                                          if (!isGoogleOAuthConfigured()) {
+                                            if (!context.mounted) return;
+                                            ScaffoldMessenger.of(context).showSnackBar(
+                                              SnackBar(
+                                                content: Text(
+                                                  messageForGoogleSignInFailure(
+                                                    StateError(
+                                                      'GOOGLE_WEB_CLIENT_ID missing.',
+                                                    ),
+                                                  ),
+                                                ),
+                                              ),
+                                            );
+                                            return;
+                                          }
                                           try {
                                             final g = ref.read(googleSignInProvider);
                                             final account = await g.signIn();
@@ -288,9 +304,8 @@ class _RegisterPageState extends ConsumerState<RegisterPage> {
                                             if (!context.mounted) return;
                                             ScaffoldMessenger.of(context).showSnackBar(
                                               SnackBar(
-                                                content: Text(
-                                                  'Could not continue with Google. Please try again.',
-                                                ),
+                                                content:
+                                                    Text(messageForGoogleSignInFailure(e)),
                                               ),
                                             );
                                           }

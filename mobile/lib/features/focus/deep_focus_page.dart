@@ -259,6 +259,11 @@ class _DeepFocusPageState extends ConsumerState<DeepFocusPage> {
     final ctaColor = TimelineTokens.isLight(context)
         ? cs.primary
         : TimelineTokens.accent;
+    final screenWidth = MediaQuery.sizeOf(context).width;
+    final compact = screenWidth < 360;
+    final ringSize = compact ? 184.0 : 220.0;
+    final titleSize = compact ? 22.0 : 26.0;
+    final timerSize = compact ? 36.0 : 44.0;
 
     return PopScope(
       canPop: false,
@@ -339,7 +344,7 @@ class _DeepFocusPageState extends ConsumerState<DeepFocusPage> {
                         textAlign: TextAlign.center,
                         style: TextStyle(
                           color: primaryText,
-                          fontSize: 26,
+                          fontSize: titleSize,
                           fontWeight: FontWeight.w900,
                           height: 1.15,
                           letterSpacing: -0.6,
@@ -347,14 +352,14 @@ class _DeepFocusPageState extends ConsumerState<DeepFocusPage> {
                       ),
                       const SizedBox(height: 28),
                       SizedBox(
-                        height: 220,
-                        width: 220,
+                        height: ringSize,
+                        width: ringSize,
                         child: Stack(
                           alignment: Alignment.center,
                           children: [
                             SizedBox(
-                              width: 220,
-                              height: 220,
+                              width: ringSize,
+                              height: ringSize,
                               child: CircularProgressIndicator(
                                 value: progress.clamp(0.0, 1.0),
                                 strokeWidth: 10,
@@ -370,7 +375,7 @@ class _DeepFocusPageState extends ConsumerState<DeepFocusPage> {
                                   _fmt(_remaining),
                                   style: TextStyle(
                                     color: primaryText,
-                                    fontSize: 44,
+                                    fontSize: timerSize,
                                     fontWeight: FontWeight.w900,
                                     letterSpacing: 1,
                                   ),

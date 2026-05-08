@@ -21,6 +21,8 @@ class NoteEditorPage extends ConsumerStatefulWidget {
 }
 
 class _NoteEditorPageState extends ConsumerState<NoteEditorPage> {
+  static const int _minTitleLength = 3;
+  static const int _minSummaryLength = 10;
   final _title = TextEditingController();
   final _body = TextEditingController();
   Timer? _debounce;
@@ -132,14 +134,18 @@ class _NoteEditorPageState extends ConsumerState<NoteEditorPage> {
     final id = _serverId;
     final updatedAt = _serverUpdatedAt;
     if (id == null || updatedAt == null || _saving) return;
+    final normalized = _normalizedFieldsForSave(
+      title: _title.text,
+      body: _body.text,
+    );
     setState(() => _saving = true);
     try {
       final n = await ref
           .read(focusFlowClientProvider)
           .updateNote(
             id,
-            title: _title.text,
-            body: _body.text,
+            title: normalized.title,
+            body: normalized.body,
             expectedUpdatedAt: updatedAt,
           );
       if (!mounted) return;
@@ -175,6 +181,28 @@ class _NoteEditorPageState extends ConsumerState<NoteEditorPage> {
   }
 
   static const _memoryIngestMinGap = Duration(seconds: 90);
+
+  ({String title, String body}) _normalizedFieldsForSave({
+    required String title,
+    required String body,
+  }) {
+    var cleanTitle = title.trim();
+    var cleanBody = body.trim();
+
+    if (cleanTitle.length < _minTitleLength && cleanBody.length >= _minSummaryLength) {
+      cleanTitle = cleanBody.split(RegExp(r'\r?\n')).first.trim();
+      if (cleanTitle.length > 80) {
+        cleanTitle = '${cleanTitle.substring(0, 80).trim()}…';
+      }
+    }
+    if (cleanTitle.length < _minTitleLength) {
+      cleanTitle = 'Untitled note';
+    }
+    if (cleanBody.length < _minSummaryLength) {
+      cleanBody = 'No summary added yet.';
+    }
+    return (title: cleanTitle, body: cleanBody);
+  }
 
   Future<void> _maybeIngestMemory() async {
     final snippet = '${_title.text.trim()}\n${_body.text.trim()}'.trim();

@@ -116,6 +116,11 @@ class _FocusPageState extends ConsumerState<FocusPage> {
     final showSoundChips = ref
         .watch(focusPrefsProvider)
         .maybeWhen(data: (p) => p.focusSounds, orElse: () => true);
+    final screenWidth = MediaQuery.sizeOf(context).width;
+    final compact = screenWidth < 360;
+    final ringSize = compact ? 184.0 : 220.0;
+    final titleSize = compact ? 18.0 : 20.0;
+    final timerSize = compact ? 30.0 : 36.0;
 
     return Scaffold(
       backgroundColor: TimelineTokens.scaffoldBg(context),
@@ -142,7 +147,7 @@ class _FocusPageState extends ConsumerState<FocusPage> {
                 style: TextStyle(
                   color: TimelineTokens.adaptivePrimaryText(context),
                   fontWeight: FontWeight.w900,
-                  fontSize: 20,
+                  fontSize: titleSize,
                   letterSpacing: -0.3,
                 ),
               ),
@@ -159,13 +164,13 @@ class _FocusPageState extends ConsumerState<FocusPage> {
               ),
               const SizedBox(height: 28),
               SizedBox(
-                height: 220,
-                width: 220,
+                height: ringSize,
+                width: ringSize,
                 child: Stack(
                   alignment: Alignment.center,
                   children: [
                     CustomPaint(
-                      size: const Size(220, 220),
+                      size: Size(ringSize, ringSize),
                       painter: _FocusRingPainter(
                         progress: _elapsedFraction,
                         accent: TimelineTokens.primaryAccent(context),
@@ -180,7 +185,7 @@ class _FocusPageState extends ConsumerState<FocusPage> {
                           style: TextStyle(
                             color: TimelineTokens.adaptivePrimaryText(context),
                             fontWeight: FontWeight.w900,
-                            fontSize: 36,
+                            fontSize: timerSize,
                             fontFamily: 'monospace',
                             letterSpacing: 1,
                           ),
@@ -355,9 +360,12 @@ class _FocusPageState extends ConsumerState<FocusPage> {
                 ],
               ),
               const Spacer(),
-              Row(
+              Wrap(
+                spacing: 10,
+                runSpacing: 10,
                 children: [
-                  Expanded(
+                  SizedBox(
+                    width: compact ? (screenWidth - 50) / 2 : (screenWidth - 72) / 4,
                     child: OutlinedButton(
                       onPressed: _pauseToTimeline,
                       style: OutlinedButton.styleFrom(
@@ -371,9 +379,8 @@ class _FocusPageState extends ConsumerState<FocusPage> {
                       child: const Text('Pause'),
                     ),
                   ),
-                  const SizedBox(width: 10),
-                  Expanded(
-                    flex: 2,
+                  SizedBox(
+                    width: compact ? (screenWidth - 50) / 2 : (screenWidth - 72) / 2,
                     child: FilledButton(
                       onPressed: () => _end('COMPLETED'),
                       style: FilledButton.styleFrom(
@@ -386,8 +393,8 @@ class _FocusPageState extends ConsumerState<FocusPage> {
                       child: const Text('Done'),
                     ),
                   ),
-                  const SizedBox(width: 10),
-                  Expanded(
+                  SizedBox(
+                    width: compact ? screenWidth - 40 : (screenWidth - 72) / 4,
                     child: OutlinedButton(
                       onPressed: () => _end('SKIPPED'),
                       style: OutlinedButton.styleFrom(
